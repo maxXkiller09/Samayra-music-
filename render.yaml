@@ -1,5 +1,5 @@
-services:
-  - type: web
+services
+-   type: web 
     name: Yuvika music 
     env: python
     region: oregon
@@ -9,19 +9,19 @@ services:
       pip install -r requirements.txt
     startCommand: python3 -m ShrutiMusic
     autoDeploy: false
-
+    
     envVars:
-      API_ID: 
+      API_ID:  
         value: 34991183
-      API_HASH: 
+      API_HASH:  
         value:  1e504957ada676fda8ccc4652eda9f0d
-      API_KEY:
+      API_KEY: 
         sync: true
       BOT_TOKEN: 8978698269:AAH6zH6IvJniGGX5lJOYGXHg1yj0wtC-DYE
         sync: false
-      MONGO_DB_URI: 
+      MONGO_DB_URI:  
         value: mongodb+srv://kamna:<kamna09>@cluster0.vkqyfnr.mongodb.net/?appName=Cluster0
-      OWNER_ID:
+      OWNER_ID: 
         value: 8068675960
       OWNER_USERNAME:
         value: @Hh74749292
@@ -50,4 +50,4 @@ services:
       DONATE:
         value: https://t.me/ShrutiBots/91
       START_IMG_URL:
-        sync: true
+        sync: true 
