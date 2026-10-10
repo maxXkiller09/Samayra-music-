@@ -1,10 +1,9 @@
 services:
   - type: web
     name: yuvika-music
-    env: docker
+    runtime: docker
     region: oregon
     plan: free
-    startCommand: python3 -m ShrutiMusic
     autoDeploy: true
     envVars:
       - key: API_ID
