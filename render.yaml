@@ -8,7 +8,7 @@ services
       apt-get update && apt-get install -y ffmpeg
       pip install -r requirements.txt
     startCommand: python3 -m ShrutiMusic
-    autoDeploy: false
+    autoDeploy: true
     
     envVars:
       API_ID:  
