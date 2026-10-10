@@ -1,53 +1,41 @@
 services:
   - type: web
     name: yuvika-music
-    env: python
+    env: docker
     region: oregon
     plan: free
-    buildCommand: |
-      apt-get update && apt-get install -y ffmpeg
-      pip install -r requirements.txt
     startCommand: python3 -m ShrutiMusic
     autoDeploy: true
-    
     envVars:
-      API_ID:  
-        value: 34991183
-      API_HASH:  
-        value:  1e504957ada676fda8ccc4652eda9f0d
-      API_KEY: 
-        sync: true
-      BOT_TOKEN:
+      - key: API_ID
+        value: "34991183"
+      - key: API_HASH
         sync: false
-      MONGO_DB_URI:  
-        value: mongodb+srv://kamna:<kamna09>@cluster0.vkqyfnr.mongodb.net/?appName=Cluster0
-      OWNER_ID: 
-        value: 8068675960
-      OWNER_USERNAME:
-        value: @Hh74749292
-      BOT_USERNAME:
-        value: @Yuvikamusic_bot
-      UPSTREAM_REPO:
+      - key: API_KEY
+        sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: MONGO_DB_URI
+        sync: false
+      - key: STRING_SESSION
+        sync: false
+      - key: OWNER_ID
+        value: "8068675960"
+      - key: OWNER_USERNAME
+        value: Hh74749292
+      - key: BOT_USERNAME
+        value: Yuvikamusic_bot
+      - key: UPSTREAM_REPO
         value: https://github.com/NoxxOP/ShrutiMusic
-      STRING_SESSION: 
-        value: BQH_KWEAa7Rulqe0V6czzcW064wGrD3YHVuTt-lkkIROMn0grcWI1Z-KPVeZvUIy9En5zCsywhXP4Xs2tiPfGw93MyA6G2YnBrow5EkHh8XD_8nLCFPIfo-gfB8cvau9n3jX-bR0q2cR5UI2NfL0_fEhvB9zW0giWrileU76GF-6tBqAWplwlbZRmRG9oHKYDOfRHmGPVLDNIxxWu53ILIkuIIobcDpTFmL8sVX31TkLWObMY0eATCr_BSKs87ros27Xk2XZ7F4ksoQKE98AHOvzluH6k-l0dWcfZI0ORmY4qbKHqb3wI_vNZKqQMsqWLqUN751jH9ppLENiUS7D2JReCn8-pwAAAAH4EDeNAA
-      GIT_TOKEN:
-        sync: true
-      HEROKU_API_KEY:
-        sync: true
-      HEROKU_APP_NAME:
-        sync: true
-      LOG_GROUP_ID:
-        value: -1003460007113
-      SUPPORT_GROUP:
+      - key: LOG_GROUP_ID
+        value: "-1003460007113"
+      - key: SUPPORT_GROUP
         value: https://t.me/+PJp0QvhoRxA5Nzhl
-      update_CHANNEL:
+      - key: SUPPORT_CHANNEL
         value: https://t.me/+J7x_kLvSbbZjNjA1
-      YOUTUBE:
+      - key: YOUTUBE
         value: https://youtube.com/@NandEditz
-      GITHUB:
+      - key: GITHUB
         value: https://github.com/NoxxOP
-      DONATE:
+      - key: DONATE
         value: https://t.me/ShrutiBots/91
-      START_IMG_URL:
-        sync: true 
