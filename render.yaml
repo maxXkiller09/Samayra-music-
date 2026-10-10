@@ -17,7 +17,7 @@ services:
         value:  1e504957ada676fda8ccc4652eda9f0d
       API_KEY: 
         sync: true
-      BOT_TOKEN: 8978698269:AAH6zH6IvJniGGX5lJOYGXHg1yj0wtC-DYE
+      BOT_TOKEN:
         sync: false
       MONGO_DB_URI:  
         value: mongodb+srv://kamna:<kamna09>@cluster0.vkqyfnr.mongodb.net/?appName=Cluster0
