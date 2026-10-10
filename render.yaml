@@ -1,6 +1,6 @@
-services
--   type: web 
-    name: Yuvika music 
+services:
+  - type: web
+    name: yuvika-music
     env: python
     region: oregon
     plan: free
