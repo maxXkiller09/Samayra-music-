@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: shruti-music
+    name: Yuvika music 
     env: python
     region: oregon
     plan: free
@@ -8,43 +8,41 @@ services:
       apt-get update && apt-get install -y ffmpeg
       pip install -r requirements.txt
     startCommand: python3 -m ShrutiMusic
-    autoDeploy: true
+    autoDeploy: false
 
     envVars:
       API_ID: 
-        value: 29448785
+        value: 34991183
       API_HASH: 
-        value: 599574f6aff0a09ebb76305b58e7e9c2
+        value:  1e504957ada676fda8ccc4652eda9f0d
       API_KEY:
-        sync: false
-      BOT_TOKEN:
+        sync: true
+      BOT_TOKEN: 8978698269:AAH6zH6IvJniGGX5lJOYGXHg1yj0wtC-DYE
         sync: false
       MONGO_DB_URI: 
-        value: mongodb+srv://pusers:nycreation@nycreation.pd4klp1.mongodb.net/?retryWrites=true&w=majority&appName=NYCREATION
+        value: mongodb+srv://kamna:<kamna09>@cluster0.vkqyfnr.mongodb.net/?appName=Cluster0
       OWNER_ID:
-        value: 7574330905
+        value: 8068675960
       OWNER_USERNAME:
-        value: WTF_WhyMeeh
+        value: @Hh74749292
       BOT_USERNAME:
-        value: ShrutixMusicBot
+        value: @Yuvikamusic_bot
       UPSTREAM_REPO:
         value: https://github.com/NoxxOP/ShrutiMusic
-      STRING_SESSION:
-        sync: false
+      STRING_SESSION: 
+        value: BQH_KWEAa7Rulqe0V6czzcW064wGrD3YHVuTt-lkkIROMn0grcWI1Z-KPVeZvUIy9En5zCsywhXP4Xs2tiPfGw93MyA6G2YnBrow5EkHh8XD_8nLCFPIfo-gfB8cvau9n3jX-bR0q2cR5UI2NfL0_fEhvB9zW0giWrileU76GF-6tBqAWplwlbZRmRG9oHKYDOfRHmGPVLDNIxxWu53ILIkuIIobcDpTFmL8sVX31TkLWObMY0eATCr_BSKs87ros27Xk2XZ7F4ksoQKE98AHOvzluH6k-l0dWcfZI0ORmY4qbKHqb3wI_vNZKqQMsqWLqUN751jH9ppLENiUS7D2JReCn8-pwAAAAH4EDeNAA
       GIT_TOKEN:
-        sync: false
+        sync: true
       HEROKU_API_KEY:
-        sync: false
+        sync: true
       HEROKU_APP_NAME:
-        sync: false
+        sync: true
       LOG_GROUP_ID:
-        value: -1002321189618
+        value: -1003460007113
       SUPPORT_GROUP:
-        value: https://t.me/ShrutiBotsupport
-      SUPPORT_CHANNEL:
-        value: https://t.me/ShrutiBots
-      INSTAGRAM:
-        value: https://instagram.com/yaduwanshi_nand
+        value: https://t.me/+PJp0QvhoRxA5Nzhl
+      update_CHANNEL:
+        value: https://t.me/+J7x_kLvSbbZjNjA1
       YOUTUBE:
         value: https://youtube.com/@NandEditz
       GITHUB:
@@ -52,4 +50,4 @@ services:
       DONATE:
         value: https://t.me/ShrutiBots/91
       START_IMG_URL:
-        sync: false
+        sync: true
