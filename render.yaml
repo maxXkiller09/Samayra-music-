@@ -10,7 +10,7 @@ services:
         value: "34991183"
       - key: API_HASH
         sync: false
-      - key: API_KEY
+      - key: SHRUTI_API_KEY
         sync: false
       - key: BOT_TOKEN
         sync: false
@@ -24,8 +24,8 @@ services:
         value: Hh74749292
       - key: BOT_USERNAME
         value: Yuvikamusic_bot
-      - key: UPSTREAM_REPO
-        value: https://github.com/NoxxOP/ShrutiMusic
+          - key: UPSTREAM_REPO
+        value: https://github.com/maxXkiller09/Samayra-music-
       - key: LOG_GROUP_ID
         value: "-1003460007113"
       - key: SUPPORT_GROUP
