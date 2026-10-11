@@ -24,7 +24,7 @@ services:
         value: Hh74749292
       - key: BOT_USERNAME
         value: Yuvikamusic_bot
-          - key: UPSTREAM_REPO
+      - key: UPSTREAM_REPO
         value: https://github.com/maxXkiller09/Samayra-music-
       - key: LOG_GROUP_ID
         value: "-1003460007113"
