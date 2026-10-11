@@ -6,6 +6,8 @@ services:
     plan: free
     autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.13
       - key: API_ID
         value: "34991183"
       - key: API_HASH
