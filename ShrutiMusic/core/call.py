@@ -53,6 +53,7 @@ from ShrutiMusic.utils.database import (
     remove_active_video_chat,
     set_loop,
 )
+from ShrutiMusic.utils.autoplay import autoplay_fill
 from ShrutiMusic.utils.exceptions import AssistantErr
 from ShrutiMusic.utils.formatters import check_duration, seconds_to_min, speed_converter
 from ShrutiMusic.utils.inline.play import stream_markup
@@ -362,6 +363,8 @@ class Call(PyTgCalls):
                 loop = loop - 1
                 await set_loop(chat_id, loop)
             await auto_clean(popped)
+            if not check:
+                await autoplay_fill(chat_id, popped)
             if not check:
                 await _clear_(chat_id)
                 return await client.leave_group_call(chat_id)
