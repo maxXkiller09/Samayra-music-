@@ -314,12 +314,11 @@ HELP_30 = """ 🔤 <b>FONT CONVERTER</b> ✨
 
 • /font [text] - Converts simple text to beautiful text by changing its font 🎨 """
 
-# 🤬 GALI COMMANDS
-HELP_31 = """ 🤬 <b>GALI COMMANDS</b> 😤
+# 😂 ROAST COMMANDS
+HELP_31 = """ 😂 <b>ROAST COMMANDS</b> 😎
 
-<b>Commands:</b>
-• /gali - Send random gali (works in DM) 💢
-• .gali - Alternative command format 🔥 """
+• /roast - Kisi ke message pe reply karke roast bhejo (sirf group admins)
+• /gali - Same kaam, masti wale roast ke saath 🔥 """
 
 # 🤖 BOT LIST
 HELP_32 = """ 🤖 <b>BOT LIST</b> 🎯
@@ -371,7 +370,6 @@ HELP_37 = """🤖 <b>ᴀᴠᴀɪʟᴀʙʟᴇ ɪɴ ᴛʜᴇsᴇ ʙᴏᴛs</b> �
 
 🔹 <b>ᴛʜɪs ғᴜɴᴄᴛɪᴏɴ ɪs sᴜᴘᴘᴏʀᴛᴇᴅ ɪɴ:</b>  
 
-• @ShrutixMusicbot – <b>Sʜʀᴜᴛɪ Mᴜsɪᴄ Bᴏᴛ</b>  
 • @M4_Music_BoT – <b>M4 Mᴜsɪᴄ Bᴏᴛ</b>  
 
 ✨ <b>ᴜsᴇ ᴛʜᴇsᴇ ʙᴏᴛs ᴛᴏ ᴇɴᴊᴏʏ ᴛʜɪs ғᴇᴀᴛᴜʀᴇ ғᴜʟʟʏ.</b>"""
