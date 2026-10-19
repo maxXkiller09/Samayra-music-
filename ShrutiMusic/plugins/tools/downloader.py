@@ -3325,15 +3325,6 @@ async def send_repo(_, message: Message):
         caption=(
             "<b>✨ ʜᴇʏ ᴅᴇᴀʀ, ʜᴇʀᴇ ɪꜱ ᴛʜᴇ ᴏꜰꜰɪᴄɪᴀʟ ʀᴇᴘᴏꜱɪᴛᴏʀʏ �ᴏꜰ ᴛʜɪꜱ ʙᴏᴛ ✨</b>\n\n"
             "🔗 �ᴏɴ'ᴛ ꜰᴏʀɢᴇᴛ ᴛᴏ ɢɪᴠᴇ ᴀ ꜱᴛᴀʀ 🌟 ᴀɴᴅ ꜰᴏʟʟᴏᴡ!\n\n"
-            "🧡 ᴄʀᴇᴅɪᴛꜱ : <a href='https://t.me/ShrutiBots'>@ShrutiBots</a>"
-        ),
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("📂 Management Bot", url="http://github.com/NoxxOP/ShrutiMusic"),
-                    InlineKeyboardButton("📂 Music Bot", url="http://github.com/NoxxOP/ShrutixMusic")
-                ]
-            ]
         ),
         supports_streaming=True,
         has_spoiler=True,
