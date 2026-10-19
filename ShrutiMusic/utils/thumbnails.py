@@ -22,6 +22,7 @@
 # ATLEAST GIVE CREDITS IF YOU STEALING :
 # ELSE NO FURTHER PUBLIC THUMBNAIL UPDATES
 
+import asyncio
 import os
 import random
 import aiohttp
@@ -225,46 +226,119 @@ def add_glow_ring(canvas, x, y, size, color, blur_amount):
     canvas.paste(ring_img, (x - 15, y - 15), ring_img)
 
 
+def _lookup_queue_meta(videoid):
+    """Search fail ho jaye to queue me jo title/duration hai wahi use karo."""
+    try:
+        from ShrutiMusic.misc import db
+
+        for entries in db.values():
+            for entry in entries or []:
+                if entry.get("vidid") == videoid:
+                    return entry.get("title"), entry.get("dur")
+    except Exception:
+        pass
+    return None, None
+
+
+def make_default_art(size=800):
+    """Thumbnail na mile to bina kisi branding ke simple vinyl-style art."""
+    img = Image.new("RGBA", (size, size))
+    draw = ImageDraw.Draw(img)
+    c = random_gradient()
+    for y in range(size):
+        t = y / size
+        col = tuple(int(c[0][i] * (1 - t) + c[2][i] * t) for i in range(3))
+        draw.line([(0, y), (size, y)], fill=(*col, 255))
+    cx = cy = size // 2
+    accent = random_accent_color()
+    for r, w in ((size * 0.42, 6), (size * 0.34, 3), (size * 0.26, 3), (size * 0.18, 3)):
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(*accent, 150), width=w)
+    r = size * 0.07
+    draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=(*accent, 255))
+    return img
+
+
+async def _download_image(session, url, path):
+    try:
+        async with session.get(url) as resp:
+            if resp.status != 200:
+                return False
+            data = await resp.read()
+        if len(data) < 3000:
+            return False
+        async with aiofiles.open(path, "wb") as f:
+            await f.write(data)
+        with Image.open(path) as im:
+            im.verify()
+        return True
+    except Exception:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+        return False
+
+
 async def gen_thumb(videoid: str):
     url = f"https://www.youtube.com/watch?v={videoid}"
     thumb_path = None
-    
+    title, duration, views, channel = None, None, None, None
+    thumburl = None
+
+    # 1) video ki details (fail ho to aage badho, rukna nahi)
     try:
         results = VideosSearch(url, limit=1)
-        result = (await results.next())["result"][0]
-
-        title = result.get("title", "Unknown Title")
-        duration = result.get("duration", "Unknown")
+        result = (await asyncio.wait_for(results.next(), timeout=12))["result"][0]
+        title = result.get("title")
+        duration = result.get("duration")
         thumburl = result["thumbnails"][0]["url"].split("?")[0]
-        views = result.get("viewCount", {}).get("short", "Unknown Views")
-        channel = result.get("channel", {}).get("name", "Unknown Channel")
+        views = (result.get("viewCount") or {}).get("short")
+        channel = (result.get("channel") or {}).get("name")
+    except Exception as e:
+        print(f"[gen_thumb] details nahi mili, queue se kaam chala raha hoon: {e}")
 
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(thumburl) as resp:
-                    if resp.status == 200:
-                        thumb_path = CACHE_DIR / f"thumb{videoid}.png"
-                        async with aiofiles.open(thumb_path, "wb") as f:
-                            await f.write(await resp.read())
-        except:
-            pass
+    if not title:
+        q_title, q_dur = _lookup_queue_meta(videoid)
+        title = q_title or "Now Playing"
+        duration = duration or q_dur
 
+    # 2) thumbnail: pehle search wali, phir YouTube ke seedhe links
+    candidates = []
+    if thumburl:
+        candidates.append(thumburl)
+    for name in ("maxresdefault", "sddefault", "hqdefault", "mqdefault"):
+        candidates.append(f"https://i.ytimg.com/vi/{videoid}/{name}.jpg")
+
+    base_img = None
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            for link in candidates:
+                path = CACHE_DIR / f"thumb{videoid}.png"
+                if await _download_image(session, link, path):
+                    thumb_path = path
+                    break
         if thumb_path and thumb_path.exists():
             base_img = Image.open(thumb_path).convert("RGBA")
-        else:
-            base_img = Image.open(DEFAULT_THUMB).convert("RGBA")
-
     except Exception as e:
-        print(f"[gen_thumb Error - Using Default] {e}")
-        try:
-            base_img = Image.open(DEFAULT_THUMB).convert("RGBA")
-            title = "ShrutiMusic"
-            duration = "Unknown"
-            views = "Unknown Views"
-            channel = "ShrutiBots"
-        except:
-            traceback.print_exc()
-            return None
+        print(f"[gen_thumb] thumbnail download error: {e}")
+
+    if base_img is None:
+        base_img = make_default_art()
+
+    # square crop (taaki kheench kar na dikhe)
+    try:
+        w, h = base_img.size
+        side = min(w, h)
+        left, top = (w - side) // 2, (h - side) // 2
+        base_img = base_img.crop((left, top, left + side, top + side))
+    except Exception:
+        pass
+
+    duration = duration or ""
+    views = views or ""
+    channel = channel or ""
 
     try:
         canvas = Image.new("RGBA", (CANVAS_W, CANVAS_H), (0, 0, 0, 255))
@@ -352,18 +426,18 @@ async def gen_thumb(videoid: str):
             parts = duration.split(":")
             if len(parts) == 2 and parts[0].isdigit():
                 duration_label = f"{parts[0]}m {parts[1]}s"
-        
+
         meta_labels = random.choice([
             ["Views", "Duration", "Channel"],
             ["", "", ""]
         ])
-        
-        meta_items = [
-            f"{meta_labels[0]} {views}" if meta_labels[0] else f"{views}",
-            f"{meta_labels[1]} {duration_label}" if meta_labels[1] else f"{duration_label}",
-            f"{meta_labels[2]} {channel}" if meta_labels[2] else f"{channel}"
-        ]
-        
+
+        meta_items = []
+        for label, value in zip(meta_labels, [views, duration_label, channel]):
+            if not value or str(value).startswith("Unknown"):
+                continue
+            meta_items.append(f"{label} {value}".strip())
+
         for idx, meta in enumerate(meta_items):
             y = meta_y + (idx * line_spacing)
             draw.text((info_x + 1, y + 1), meta, fill=(0, 0, 0, 140), font=meta_font)
@@ -396,4 +470,9 @@ async def gen_thumb(videoid: str):
     except Exception as e:
         print(f"[gen_thumb Processing Error] {e}")
         traceback.print_exc()
-        return None
+        try:
+            raw = CACHE_DIR / f"{videoid}_raw.png"
+            base_img.convert("RGB").save(raw)
+            return str(raw)
+        except Exception:
+            return None
