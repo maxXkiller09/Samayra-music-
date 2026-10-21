@@ -28,6 +28,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, CallbackQ
 from ShrutiMusic import YouTube, app
 from ShrutiMusic.core.call import Nand
 from ShrutiMusic.misc import SUDOERS, db
+from ShrutiMusic.utils.autoplay import autoplay_fill
 from ShrutiMusic.utils.database import (
     get_active_chats,
     get_lang,
@@ -74,30 +75,6 @@ async def show_help_page1(client, callback_query: CallbackQuery):
         caption=_["help_1"].format(SUPPORT_GROUP),
         reply_markup=help_pannel_page1(_, START=True)
     )
-
-@app.on_callback_query(filters.regex("fork_repo"))
-async def fork_repo_callback(client, query):
-    await query.message.edit_text(
-        text=(
-            "✨ <b>ʙᴜɪʟᴅ Yᴏᴜʀ Oᴡɴ ᴍᴜsɪᴄ ʙᴏᴛ 🎧</b>\n\n"
-            "🚀 ʀᴇᴀᴅʏ ᴛᴏ ʟᴀᴜɴᴄʜ ʏᴏᴜʀ ᴏᴡɴ ʙᴏᴛ?\n"
-            "ғᴏʀᴋ ᴛʜᴇ ʀᴇᴘᴏ ᴀɴᴅ ᴅᴇᴘʟᴏʏ ɪɴ sᴇᴄᴏɴᴅs.\n\n"
-            "🔧 <b>Cᴜsᴛᴏᴍɪᴢᴇ ɪᴛ. Dᴇᴘʟᴏʏ ɪᴛ. Vɪʙᴇ ᴡɪᴛʜ ɪᴛ 🔥</b>"
-        ),
-        disable_web_page_preview=True,
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("🚀 Fᴏʀᴋ Rᴇᴘᴏ", url="https://github.com/NoxxOP/ShrutiMusic/fork"),
-                    InlineKeyboardButton("⚡ Hᴇʀᴏᴋᴜ Dᴇᴘʟᴏʏ", url="https://dashboard.heroku.com/new?template=https://github.com/NoxxOP/ShrutiMusic")
-                ],
-                [
-                    InlineKeyboardButton("🔙 Bᴀᴄᴋ", callback_data="settingsback_helper")
-                ]
-            ]
-        )
-    )
-
 
 from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardMarkup
@@ -394,6 +371,8 @@ async def del_back_playlist(client, CallbackQuery, _):
                 popped = check.pop(0)
                 if popped:
                     await auto_clean(popped)
+                if not check:
+                    await autoplay_fill(chat_id, popped)
                 if not check:
                     await CallbackQuery.edit_message_text(
                         f"➻ sᴛʀᴇᴀᴍ sᴋɪᴩᴩᴇᴅ 🎄\n│ \n└ʙʏ : {mention} 🥀"

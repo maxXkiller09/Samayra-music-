@@ -27,6 +27,7 @@ import config
 from ShrutiMusic import YouTube, app
 from ShrutiMusic.core.call import Nand
 from ShrutiMusic.misc import db
+from ShrutiMusic.utils.autoplay import autoplay_fill
 from ShrutiMusic.utils.database import get_loop
 from ShrutiMusic.utils.decorators import AdminRightsCheck
 from ShrutiMusic.utils.inline import close_markup, stream_markup
@@ -89,6 +90,8 @@ async def skip(cli, message: Message, _, chat_id):
             popped = check.pop(0)
             if popped:
                 await auto_clean(popped)
+            if not check:
+                await autoplay_fill(chat_id, popped)
             if not check:
                 await message.reply_text(
                     text=_["admin_6"].format(
