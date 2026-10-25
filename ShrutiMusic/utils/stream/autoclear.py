@@ -31,7 +31,7 @@ async def auto_clean(popped):
         autoclean.remove(rem)
         count = autoclean.count(rem)
         if count == 0:
-            if "vid_" not in rem or "live_" not in rem or "index_" not in rem:
+            if not os.path.basename(str(rem)).startswith(("vid_", "live_", "index_")):
                 try:
                     os.remove(rem)
                 except:
