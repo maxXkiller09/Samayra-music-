@@ -117,7 +117,7 @@ def _find_link(data):
 
 
 MAX_AUDIO_DOWNLOAD_BYTES = int(os.environ.get("MAX_AUDIO_DOWNLOAD_BYTES", "104857600"))
-MAX_VIDEO_DOWNLOAD_BYTES = int(os.environ.get("MAX_VIDEO_DOWNLOAD_BYTES", "2145386496"))
+MAX_VIDEO_DOWNLOAD_BYTES = int(os.environ.get("MAX_VIDEO_DOWNLOAD_BYTES", str(500 * 1024 * 1024)))
 
 
 def _safe_public_download_url(value: str) -> bool:
@@ -143,6 +143,8 @@ async def _save_stream(resp, file_path: str, max_bytes: int) -> bool:
     try:
         length = resp.headers.get("Content-Length")
         if length and int(length) > max_bytes:
+            if os.path.exists(file_path):
+                os.remove(file_path)
             return False
         written = 0
         with open(file_path, "wb") as f:
