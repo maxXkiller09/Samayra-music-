@@ -5,12 +5,15 @@ services:
     region: oregon
     plan: free
     autoDeploy: true
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.13
       - key: API_ID
         value: "34991183"
       - key: API_HASH
+        sync: false
+      - key: BASE_API_URL
         sync: false
       - key: SHRUTI_API_KEY
         sync: false
