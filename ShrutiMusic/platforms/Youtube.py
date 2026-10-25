@@ -59,11 +59,36 @@ def time_to_seconds(time):
 
 
 def _extract_video_id(link: str) -> str:
-    if "v=" in link:
-        return link.split("v=")[-1].split("&")[0]
-    if "youtu.be/" in link:
-        return link.split("youtu.be/")[-1].split("?")[0].split("&")[0]
-    return link
+    """Return a safe YouTube video ID; reject arbitrary strings and paths."""
+    from urllib.parse import parse_qs, urlparse
+
+    value = (link or "").strip()
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", value):
+        return value
+
+    try:
+        parsed = urlparse(value if "://" in value else "https://" + value)
+    except ValueError:
+        return ""
+
+    host = (parsed.hostname or "").lower()
+    if host not in {
+        "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
+        "youtu.be", "www.youtu.be", "youtube-nocookie.com", "www.youtube-nocookie.com",
+    }:
+        return ""
+
+    candidate = ""
+    if host.endswith("youtu.be"):
+        candidate = parsed.path.strip("/").split("/")[0]
+    elif parsed.path == "/watch":
+        candidate = parse_qs(parsed.query).get("v", [""])[0]
+    else:
+        parts = [part for part in parsed.path.split("/") if part]
+        if len(parts) >= 2 and parts[0] in {"shorts", "embed", "live", "v"}:
+            candidate = parts[1]
+
+    return candidate if re.fullmatch(r"[A-Za-z0-9_-]{11}", candidate) else ""
 
 
 def _find_link(data):
