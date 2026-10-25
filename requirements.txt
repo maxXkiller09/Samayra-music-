@@ -1,8 +1,6 @@
-pyrofork
 gTTS
 aiofiles
 aiohttp
-asyncio
 beautifulsoup4
 dnspython
 ffmpeg-python

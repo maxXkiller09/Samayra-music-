@@ -1,6 +1,8 @@
 import asyncio
+import ipaddress
 import os
 import re
+from urllib.parse import urlparse
 from typing import Union
 import yt_dlp
 from pyrogram.enums import MessageEntityType
@@ -114,11 +116,49 @@ def _find_link(data):
     return None
 
 
-async def _save_stream(resp, file_path: str) -> bool:
-    with open(file_path, "wb") as f:
-        async for chunk in resp.content.iter_chunked(131072):
-            f.write(chunk)
-    return os.path.exists(file_path) and os.path.getsize(file_path) > 0
+MAX_AUDIO_DOWNLOAD_BYTES = int(os.environ.get("MAX_AUDIO_DOWNLOAD_BYTES", "104857600"))
+MAX_VIDEO_DOWNLOAD_BYTES = int(os.environ.get("MAX_VIDEO_DOWNLOAD_BYTES", "2145386496"))
+
+
+def _safe_public_download_url(value: str) -> bool:
+    """Accept only HTTP(S) URLs with a public hostname for API-provided files."""
+    try:
+        parsed = urlparse(value)
+        if parsed.scheme not in {"https", "http"} or not parsed.hostname:
+            return False
+        host = parsed.hostname.lower().rstrip(".")
+        if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
+            return False
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            return True
+        return address.is_global
+    except (TypeError, ValueError):
+        return False
+
+
+async def _save_stream(resp, file_path: str, max_bytes: int) -> bool:
+    """Stream a download with a size cap and remove partial files on failure."""
+    try:
+        length = resp.headers.get("Content-Length")
+        if length and int(length) > max_bytes:
+            return False
+        written = 0
+        with open(file_path, "wb") as f:
+            async for chunk in resp.content.iter_chunked(131072):
+                written += len(chunk)
+                if written > max_bytes:
+                    raise ValueError("download exceeds configured size limit")
+                f.write(chunk)
+        return written > 0 and os.path.getsize(file_path) > 0
+    except Exception:
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except OSError:
+            pass
+        return False
 
 
 async def _api_download(link: str, media: str, ext: str, timeout: int):
@@ -164,7 +204,7 @@ async def _api_download(link: str, media: str, ext: str, timeout: int):
                 content_type = (resp.headers.get("Content-Type") or "").lower()
                 if "json" not in content_type and "text/html" not in content_type:
                     # API seedha file bhejti hai (Shruti style)
-                    if await _save_stream(resp, file_path):
+                    if await _save_stream(resp, file_path, MAX_VIDEO_DOWNLOAD_BYTES if media == "video" else MAX_AUDIO_DOWNLOAD_BYTES):
                         return file_path
                     return None
                 # API JSON me link deti hai -> link nikaal ke download karo
@@ -178,11 +218,14 @@ async def _api_download(link: str, media: str, ext: str, timeout: int):
             if not file_url:
                 print("[API] response me download link nahi mila")
                 return None
-            async with session.get(file_url, timeout=request_timeout) as file_resp:
+            if not _safe_public_download_url(file_url):
+                print("[API] rejected unsafe download URL")
+                return None
+            async with session.get(file_url, timeout=request_timeout, allow_redirects=False) as file_resp:
                 if file_resp.status != 200:
                     print(f"[API] file status {file_resp.status}")
                     return None
-                if await _save_stream(file_resp, file_path):
+                if await _save_stream(file_resp, file_path, MAX_VIDEO_DOWNLOAD_BYTES if media == "video" else MAX_AUDIO_DOWNLOAD_BYTES):
                     return file_path
         return None
     except Exception as ae:
