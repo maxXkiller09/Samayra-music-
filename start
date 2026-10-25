@@ -1,1 +1,9 @@
-python3 -m ShrutiMusic
+#!/usr/bin/env bash
+set -e
+
+# Render Web Services must bind to the injected PORT.
+python3 health_server.py &
+HEALTH_PID=$!
+trap 'kill "$HEALTH_PID" 2>/dev/null || true' EXIT
+
+exec python3 -m ShrutiMusic
