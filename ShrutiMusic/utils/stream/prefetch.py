@@ -40,6 +40,8 @@ async def _prefetch_item(chat_id, item):
             return
 
         current_queue = db.get(chat_id) or []
+        # If stop/skip removed the item during download, leave the completed
+        # file in the downloader cache for safe reuse; never resurrect the item.
         replace_tracked_queue_item(
             current_queue, autoclean, item, old_file, file_path
         )
@@ -67,10 +69,12 @@ def schedule_next_prefetch(chat_id):
     if not isinstance(file_path, str) or not file_path.startswith("vid_"):
         return None
 
+    # Bound resource use: never run more than one prefetch download per chat.
+    for (key, task) in list(_TASKS.items()):
+        if key[0] == chat_id and not task.done():
+            return task
+
     key = (chat_id, id(item))
-    task = _TASKS.get(key)
-    if task and not task.done():
-        return task
     task = asyncio.create_task(_prefetch_item(chat_id, item))
     _TASKS[key] = task
     return task
