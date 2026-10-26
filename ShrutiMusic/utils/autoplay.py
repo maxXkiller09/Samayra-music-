@@ -144,7 +144,11 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
         # One focused query keeps end-of-track lookup lightweight. Rank the
         # returned pool locally instead of choosing an arbitrary first result.
         query = f"songs like {current_title} similar vibe"
-        results = (await VideosSearch(query, limit=15).next()).get("result", [])
+        # Never let a slow search hold the voice chat at the end of the queue.
+        # If YouTube search stalls, autoplay safely gives up and playback can end.
+        results = (
+            await asyncio.wait_for(VideosSearch(query, limit=15).next(), timeout=12)
+        ).get("result", [])
         # If the current song ended while search was running, allow the result
         # only while the voice chat is still active and no manual track replaced it.
         current_queue = db.get(chat_id) or []
