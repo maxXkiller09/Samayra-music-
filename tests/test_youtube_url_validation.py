@@ -70,5 +70,13 @@ class DownloadUrlSafetyTests(unittest.TestCase):
         self.assertFalse(YOUTUBE._safe_public_download_url("http://[::1]/file"))
 
 
+class RepositoryImportSafetyTests(unittest.TestCase):
+    def test_standard_queue_module_is_not_shadowed(self):
+        import queue
+
+        self.assertTrue(hasattr(queue, "SimpleQueue"))
+        self.assertFalse((ROOT / "queue.py").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
