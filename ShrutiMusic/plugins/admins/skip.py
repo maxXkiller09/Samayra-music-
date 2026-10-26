@@ -116,6 +116,14 @@ async def skip(cli, message: Message, _, chat_id):
                 return await Nand.stop_stream(chat_id)
             except:
                 return
+    # Re-read the queue because stop/skip can run concurrently and replace it.
+    check = db.get(chat_id) or []
+    if not check:
+        try:
+            await Nand.stop_stream(chat_id)
+        except Exception:
+            pass
+        return
     # Queue edits (including /skip N) can change which item needs preparing.
     # Scheduling here covers changes made after the original queue insertion.
     schedule_next_prefetch(chat_id)
