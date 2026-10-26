@@ -358,30 +358,51 @@ class Call(PyTgCalls):
             if users == 1:
                 autoend[chat_id] = datetime.now() + timedelta(minutes=1)
 
-    async def change_stream(self, client, chat_id):
-        check = db.get(chat_id)
-        popped = None
-        loop = await get_loop(chat_id)
+    async def _skip_failed_queued_track(self, client, chat_id, original_chat_id, error_text):
+        """Remove a failed queue item and try the next item without advancing twice."""
+        queue = db.get(chat_id)
+        if queue:
+            failed = queue.pop(0)
+            await auto_clean(failed)
         try:
-            if loop == 0:
-                popped = check.pop(0)
-            else:
-                loop = loop - 1
-                await set_loop(chat_id, loop)
-            await auto_clean(popped)
-            if not check:
-                await autoplay_fill(chat_id, popped)
-            if not check:
-                await _clear_(chat_id)
-                return await client.leave_group_call(chat_id)
-        except:
+            await app.send_message(original_chat_id, text=error_text)
+        except Exception:
+            pass
+        if db.get(chat_id):
+            return await self.change_stream(client, chat_id, advance=False)
+        await _clear_(chat_id)
+        try:
+            return await client.leave_group_call(chat_id)
+        except Exception:
+            return
+
+    async def change_stream(self, client, chat_id, advance=True):
+        check = db.get(chat_id)
+        if advance:
+            popped = None
+            loop = await get_loop(chat_id)
             try:
-                await _clear_(chat_id)
+                if loop == 0:
+                    popped = check.pop(0)
+                else:
+                    loop = loop - 1
+                    await set_loop(chat_id, loop)
+                await auto_clean(popped)
+                if not check:
+                    await autoplay_fill(chat_id, popped)
+            except Exception:
+                try:
+                    await _clear_(chat_id)
+                    return await client.leave_group_call(chat_id)
+                except Exception:
+                    return
+        if not check:
+            await _clear_(chat_id)
+            try:
                 return await client.leave_group_call(chat_id)
-            except:
+            except Exception:
                 return
-        else:
-            queued = check[0]["file"]
+        queued = check[0]["file"]
             language = await get_lang(chat_id)
             _ = get_string(language)
             title = (check[0]["title"]).title()
@@ -419,9 +440,8 @@ class Call(PyTgCalls):
                 try:
                     await client.change_stream(chat_id, stream)
                 except Exception:
-                    return await app.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
+                    return await self._skip_failed_queued_track(
+                        client, chat_id, original_chat_id, _["call_6"]
                     )
                 img = await gen_thumb(videoid)
                 button = stream_markup(_, chat_id)
@@ -447,13 +467,21 @@ class Call(PyTgCalls):
                         videoid=True,
                         video=True if str(streamtype) == "video" else False,
                     )
-                except:
-                    return await mystic.edit_text(
-                        _["call_6"], disable_web_page_preview=True
+                except Exception:
+                    try:
+                        await mystic.delete()
+                    except Exception:
+                        pass
+                    return await self._skip_failed_queued_track(
+                        client, chat_id, original_chat_id, _["call_6"]
                     )
                 if not file_path:
-                    return await mystic.edit_text(
-                        _["call_6"], disable_web_page_preview=True
+                    try:
+                        await mystic.delete()
+                    except Exception:
+                        pass
+                    return await self._skip_failed_queued_track(
+                        client, chat_id, original_chat_id, _["call_6"]
                     )
                 replace_queue_file(chat_id, queued, file_path)
                 if video:
@@ -469,10 +497,9 @@ class Call(PyTgCalls):
                     )
                 try:
                     await client.change_stream(chat_id, stream)
-                except:
-                    return await app.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
+                except Exception:
+                    return await self._skip_failed_queued_track(
+                        client, chat_id, original_chat_id, _["call_6"]
                     )
                 img = await gen_thumb(videoid)
                 button = stream_markup(_, chat_id)
@@ -502,10 +529,9 @@ class Call(PyTgCalls):
                 )
                 try:
                     await client.change_stream(chat_id, stream)
-                except:
-                    return await app.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
+                except Exception:
+                    return await self._skip_failed_queued_track(
+                        client, chat_id, original_chat_id, _["call_6"]
                     )
                 button = stream_markup(_, chat_id)
                 run = await app.send_photo(
@@ -530,10 +556,9 @@ class Call(PyTgCalls):
                     )
                 try:
                     await client.change_stream(chat_id, stream)
-                except:
-                    return await app.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
+                except Exception:
+                    return await self._skip_failed_queued_track(
+                        client, chat_id, original_chat_id, _["call_6"]
                     )
                 if videoid == "telegram":
                     button = stream_markup(_, chat_id)
