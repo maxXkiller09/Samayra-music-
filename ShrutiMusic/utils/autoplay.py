@@ -223,7 +223,15 @@ async def autoplay_fill(chat_id, popped):
     existing = _fill_tasks.get(chat_id)
     if existing and existing is not asyncio.current_task():
         try:
-            return await asyncio.shield(existing)
+            if await asyncio.shield(existing):
+                return True
+        except Exception:
+            pass
+        try:
+            from ShrutiMusic.misc import db
+
+            if db.get(chat_id):
+                return False
         except Exception:
             return False
 
