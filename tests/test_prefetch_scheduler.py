@@ -58,6 +58,27 @@ class PrefetchSchedulerTests(unittest.IsolatedAsyncioTestCase):
         gate.set()
         await active
 
+    async def test_reschedules_when_next_item_changes_while_prefetch_is_busy(self):
+        chat_id = -100456
+        attempted = {"file": "vid_old", "vidid": "old"}
+        replacement = {"file": "vid_new", "vidid": "new"}
+        self.db_data[chat_id] = [{"file": "/cache/current.mp3"}, replacement]
+
+        with patch.object(self.module, "schedule_next_prefetch") as schedule:
+            self.module._reschedule_if_next_changed(chat_id, attempted, None)
+
+        schedule.assert_called_once_with(chat_id)
+
+    async def test_does_not_reschedule_when_same_next_item_remains(self):
+        chat_id = -100789
+        attempted = {"file": "vid_same", "vidid": "same"}
+        self.db_data[chat_id] = [{"file": "/cache/current.mp3"}, attempted]
+
+        with patch.object(self.module, "schedule_next_prefetch") as schedule:
+            self.module._reschedule_if_next_changed(chat_id, attempted, None)
+
+        schedule.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
