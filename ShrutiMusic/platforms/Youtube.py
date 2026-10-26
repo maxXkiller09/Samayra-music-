@@ -125,7 +125,12 @@ def _safe_public_download_url(value: str) -> bool:
     """Accept only HTTP(S) URLs with a public hostname for API-provided files."""
     try:
         parsed = urlparse(value)
-        if parsed.scheme not in {"https", "http"} or not parsed.hostname:
+        if (
+            parsed.scheme not in {"https", "http"}
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
             return False
         host = parsed.hostname.lower().rstrip(".")
         if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
@@ -210,7 +215,7 @@ async def _api_download_unlocked(link: str, media: str, ext: str, timeout: int):
                 f"{API_URL}{endpoint}", params=params, timeout=request_timeout
             ) as resp:
                 if resp.status != 200:
-                    print(f"[API] status {resp.status} from {API_URL}{endpoint}")
+                    print(f"[API] download API returned HTTP status {resp.status}")
                     return None
                 content_type = (resp.headers.get("Content-Type") or "").lower()
                 if "json" not in content_type and "text/html" not in content_type:

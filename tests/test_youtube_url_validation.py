@@ -60,6 +60,11 @@ class DownloadUrlSafetyTests(unittest.TestCase):
     def test_rejects_non_http_scheme(self):
         self.assertFalse(YOUTUBE._safe_public_download_url("file:///etc/passwd"))
 
+    def test_rejects_urls_with_embedded_credentials(self):
+        self.assertFalse(
+            YOUTUBE._safe_public_download_url("https://user:secret@example.com/file.mp3")
+        )
+
     def test_rejects_localhost(self):
         self.assertFalse(YOUTUBE._safe_public_download_url("http://localhost/file"))
 
