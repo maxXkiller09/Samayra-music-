@@ -209,6 +209,20 @@ def _clear_fill_task(chat_id, task):
         _fill_tasks.pop(chat_id, None)
 
 
+def _reschedule_if_track_changed(chat_id, attempted_track, _task):
+    """Restart proactive search if a different sole queue item replaced this track."""
+    if not AUTOPLAY.get(chat_id):
+        return
+    try:
+        from ShrutiMusic.misc import db
+
+        queue = db.get(chat_id) or []
+        if len(queue) == 1 and queue[0] is not attempted_track:
+            schedule_autoplay_fill(chat_id, queue[0])
+    except Exception as exc:
+        print(f"[autoplay] reschedule error: {type(exc).__name__}: {exc}")
+
+
 def schedule_autoplay_fill(chat_id, current_track):
     """Start finding one similar song early, while the current track is playing."""
     if not current_track or not AUTOPLAY.get(chat_id):
@@ -221,6 +235,9 @@ def schedule_autoplay_fill(chat_id, current_track):
     )
     _fill_tasks[chat_id] = task
     task.add_done_callback(lambda done: _clear_fill_task(chat_id, done))
+    task.add_done_callback(
+        lambda done: _reschedule_if_track_changed(chat_id, current_track, done)
+    )
     return task
 
 
