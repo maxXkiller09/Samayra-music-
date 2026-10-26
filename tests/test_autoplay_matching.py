@@ -68,6 +68,27 @@ class AutoplayMatchingTests(unittest.TestCase):
         self.assertFalse(self.module._is_short("4:99"))
         self.assertFalse(self.module._is_short(None))
 
+    def test_proactive_autoplay_reschedules_when_sole_track_changes(self):
+        old_track = {"title": "Old song"}
+        new_track = {"title": "New song"}
+        fake_misc = types.ModuleType("ShrutiMusic.misc")
+        fake_misc.db = {-1001: [new_track]}
+        with patch.dict(sys.modules, {"ShrutiMusic.misc": fake_misc}):
+            with patch.dict(self.module.AUTOPLAY, {-1001: True}):
+                with patch.object(self.module, "schedule_autoplay_fill") as schedule:
+                    self.module._reschedule_if_track_changed(-1001, old_track, None)
+        schedule.assert_called_once_with(-1001, new_track)
+
+    def test_proactive_autoplay_does_not_reschedule_same_track(self):
+        current_track = {"title": "Same song"}
+        fake_misc = types.ModuleType("ShrutiMusic.misc")
+        fake_misc.db = {-1002: [current_track]}
+        with patch.dict(sys.modules, {"ShrutiMusic.misc": fake_misc}):
+            with patch.dict(self.module.AUTOPLAY, {-1002: True}):
+                with patch.object(self.module, "schedule_autoplay_fill") as schedule:
+                    self.module._reschedule_if_track_changed(-1002, current_track, None)
+        schedule.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
