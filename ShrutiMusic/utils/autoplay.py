@@ -1,5 +1,4 @@
 import asyncio
-import random
 import re
 
 from ShrutiMusic.core.mongo import mongodb
@@ -8,6 +7,16 @@ autoplay_db = mongodb.autoplay
 AUTOPLAY = {}  # chat_id -> bool (button ke liye sync cache)
 _recent = {}  # chat_id -> pichle vidid (repeat se bachne ke liye)
 _loaded = False
+
+# Lightweight mood hints from titles; no extra API or model call required.
+_MOOD_WORDS = {
+    "sad": {"sad", "heartbreak", "broken", "bewafa", "dard", "rona", "alone", "cry"},
+    "romantic": {"love", "romantic", "romance", "ishq", "pyaar", "mohabbat", "jaan"},
+    "party": {"party", "dance", "club", "dj", "dance", "nach", "bhangra"},
+    "devotional": {"bhajan", "bhakti", "devotional", "aarti", "mantra", "shiv", "krishna"},
+    "lofi": {"lofi", "slowed", "reverb", "chill", "relax", "lo-fi"},
+    "rap": {"rap", "rapper", "hiphop", "hip-hop", "drill", "diss"},
+}
 
 
 def autoplay_label(chat_id):
@@ -35,26 +44,69 @@ async def set_autoplay(chat_id, value: bool):
 
 
 def _clean_title(title):
-    t = re.sub(r"[\(\[\{].*?[\)\]\}]", " ", title or "")
-    t = re.sub(r"(?i)\b(official|video|audio|lyrics?|lyrical|full|song|hd|4k|remix|mp3)\b", " ", t)
-    return re.sub(r"\s+", " ", t).strip()[:60]
+    t = re.sub(r"[\\(\\[\\{].*?[\\)\\]\\}]", " ", title or "")
+    t = re.sub(r"(?i)\\b(official|video|audio|lyrics?|lyrical|full|song|hd|4k|mp3)\\b", " ", t)
+    return re.sub(r"\\s+", " ", t).strip()[:80]
+
+
+def _tokens(text):
+    return set(re.findall(r"[a-z0-9]+", (text or "").lower()))
+
+
+def _moods(text):
+    words = _tokens(text)
+    return {mood for mood, hints in _MOOD_WORDS.items() if words & hints}
+
+
+def _artist_hint(title):
+    """Use an explicit 'artist - track' title prefix when available."""
+    parts = re.split(r"\\s[-–—]\\s", _clean_title(title), maxsplit=1)
+    return parts[0].strip() if len(parts) == 2 and parts[0].strip() else ""
+
+
+def _score_candidate(current_title, candidate):
+    """Rank results by mood/artist/word overlap and penalize near-duplicates."""
+    title = candidate.get("title") or ""
+    current = _clean_title(current_title).lower()
+    candidate_clean = _clean_title(title).lower()
+    if not candidate_clean or candidate_clean == current:
+        return -100
+
+    current_words = _tokens(current)
+    candidate_words = _tokens(candidate_clean)
+    shared = current_words & candidate_words
+    # Generic words are weak evidence; mood and artist hints matter more.
+    generic = {"the", "and", "song", "songs", "official", "video", "audio", "lyrics"}
+    score = min(len(shared - generic), 4)
+    current_moods = _moods(current_title)
+    candidate_moods = _moods(title)
+    if current_moods and candidate_moods:
+        score += 5 if current_moods & candidate_moods else -3
+    artist = _artist_hint(current_title)
+    if artist and artist.lower() in title.lower():
+        score += 3
+    duration = str(candidate.get("duration") or "")
+    if not duration or len(duration.split(":")) != 2:
+        score -= 8
+    return score
 
 
 def _is_short(duration):
-    """3 ghante se chhota aur 10 minute se kam wala hi chuno (mix/podcast skip)."""
+    """Keep normal tracks under 10 minutes; skip mixes and podcasts."""
     if not duration:
         return False
     parts = str(duration).split(":")
     if len(parts) != 2:
         return False
     try:
-        return int(parts[0]) < 10
+        minutes, seconds = (int(part) for part in parts)
+        return 0 <= minutes < 10 and 0 <= seconds < 60
     except ValueError:
         return False
 
 
 async def autoplay_fill(chat_id, popped):
-    """Queue khatam hone par agar autoplay ON hai to milta-julta gaana queue me daal do."""
+    """Queue a relevant next track when the queue ends and autoplay is enabled."""
     try:
         if not popped or not AUTOPLAY.get(chat_id):
             return False
@@ -67,22 +119,32 @@ async def autoplay_fill(chat_id, popped):
         seen = _recent.setdefault(chat_id, [])
         if popped.get("vidid"):
             seen.append(popped["vidid"])
-        del seen[:-15]
+        del seen[:-20]
 
-        query = f"{_clean_title(popped.get('title'))} songs"
-        results = (await VideosSearch(query, limit=12).next()).get("result", [])
+        current_title = _clean_title(popped.get("title"))
+        if not current_title:
+            return False
+        # One focused query keeps end-of-track lookup lightweight. Rank the
+        # returned pool locally instead of choosing an arbitrary first result.
+        query = f"songs like {current_title} similar vibe"
+        results = (await VideosSearch(query, limit=15).next()).get("result", [])
         pool = [
-            r for r in results
-            if r.get("id") not in seen and _is_short(r.get("duration"))
+            item for item in results
+            if item.get("id")
+            and item.get("id") not in seen
+            and _is_short(item.get("duration"))
         ]
         if not pool:
             return False
-        pick = random.choice(pool[:6])
+        pick = max(pool, key=lambda item: _score_candidate(current_title, item))
+        if _score_candidate(current_title, pick) < -5:
+            return False
 
         vidid = pick["id"]
         title = pick["title"]
         duration = pick["duration"]
         seen.append(vidid)
+        del seen[:-20]
         if chat_id not in db:
             db[chat_id] = []
         await put_queue(
