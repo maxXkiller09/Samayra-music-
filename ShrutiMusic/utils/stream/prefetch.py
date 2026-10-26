@@ -5,6 +5,7 @@ for small hosts such as Render Free Web Service.
 """
 
 import asyncio
+import os
 
 from config import autoclean
 from ShrutiMusic.misc import db
@@ -40,9 +41,17 @@ async def _prefetch_item(chat_id, item):
             return
 
         current_queue = db.get(chat_id) or []
-        replace_tracked_queue_item(
+        replaced = replace_tracked_queue_item(
             current_queue, autoclean, item, old_file, file_path
         )
+        if not replaced and file_path not in autoclean:
+            # A stop/skip may have removed the item while the download ran.
+            # Do not leave an untracked download behind, but keep shared cache
+            # files that are still referenced by another queue entry.
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
     except asyncio.CancelledError:
         raise
     except Exception as exc:
@@ -67,10 +76,12 @@ def schedule_next_prefetch(chat_id):
     if not isinstance(file_path, str) or not file_path.startswith("vid_"):
         return None
 
+    # Bound resource use: never run more than one prefetch download per chat.
+    for (key, task) in list(_TASKS.items()):
+        if key[0] == chat_id and not task.done():
+            return task
+
     key = (chat_id, id(item))
-    task = _TASKS.get(key)
-    if task and not task.done():
-        return task
     task = asyncio.create_task(_prefetch_item(chat_id, item))
     _TASKS[key] = task
     return task
