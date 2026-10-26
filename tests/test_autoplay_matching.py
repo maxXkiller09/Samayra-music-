@@ -42,6 +42,15 @@ class AutoplayMatchingTests(unittest.TestCase):
             self.module._score_candidate(current, similar),
             self.module._score_candidate(current, unrelated),
         )
+        self.assertLess(self.module._score_candidate(current, unrelated), 1)
+
+    def test_unrelated_neutral_track_does_not_pass_relevance_cutoff(self):
+        current = "Arijit Singh - Tum Hi Ho"
+        unrelated = {
+            "title": "Heavy Metal Workout Mix",
+            "duration": "3:35",
+        }
+        self.assertLess(self.module._score_candidate(current, unrelated), 1)
 
     def test_exact_same_title_is_rejected(self):
         title = "Arijit Singh - Tum Hi Ho"

@@ -170,8 +170,14 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
         ]
         if not pool:
             return False
-        pick = max(pool, key=lambda item: _score_candidate(current_title, item))
-        if _score_candidate(current_title, pick) < -5:
+        ranked = sorted(
+            pool, key=lambda item: _score_candidate(current_title, item), reverse=True
+        )
+        # A score below 1 means there is no meaningful mood, artist, or title
+        # overlap. The previous -5 cutoff admitted almost every valid-duration
+        # result, including unrelated tracks returned by broad YouTube searches.
+        pick = ranked[0]
+        if _score_candidate(current_title, pick) < 1:
             return False
 
         vidid = pick["id"]
