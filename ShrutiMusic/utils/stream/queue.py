@@ -73,6 +73,14 @@ async def put_queue(
     else:
         db[chat_id].append(put)
     autoclean.append(file)
+    if not forceplay:
+        try:
+            from ShrutiMusic.utils.stream.prefetch import schedule_next_prefetch
+
+            schedule_next_prefetch(chat_id)
+        except RuntimeError:
+            # put_queue may be used outside a running event loop in tests/tools.
+            pass
 
 
 async def put_queue_index(
