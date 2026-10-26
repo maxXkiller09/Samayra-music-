@@ -29,6 +29,15 @@ class AutoplayMatchingTests(unittest.TestCase):
             "Arijit Singh - Tum Hi Ho",
         )
 
+    def test_search_query_adds_mood_hint_when_detectable(self):
+        query = self.module._search_query("Arijit Singh - Sad Heartbreak Song")
+        self.assertIn("similar vibe", query)
+        self.assertIn("sad heartbreak songs", query)
+
+    def test_search_query_keeps_neutral_titles_neutral(self):
+        query = self.module._search_query("Arijit Singh - Tum Hi Ho")
+        self.assertEqual(query, "songs like Arijit Singh - Tum Hi Ho similar vibe")
+
     def test_mood_and_artist_match_ranks_above_unrelated_track(self):
         current = "Arijit Singh - Sad Heartbreak Song"
         similar = {
