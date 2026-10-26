@@ -81,8 +81,8 @@ def schedule_next_prefetch(chat_id):
         return None
 
     # Bound resource use: never run more than one prefetch download per chat.
-    # The active task's completion callback will schedule the new queue[1] if
-    # the queue changed while that task occupied this chat's prefetch slot.
+    # The active task's completion callback schedules the new queue[1] if the
+    # queue changed while that task occupied this chat's prefetch slot.
     for (key, task) in list(_TASKS.items()):
         if key[0] == chat_id and not task.done():
             return task
