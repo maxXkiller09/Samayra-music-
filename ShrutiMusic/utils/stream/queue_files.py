@@ -30,3 +30,8 @@ def replace_tracked_queue_item(queue, tracked_files, item, old_file, new_file):
     tracked_files.append(new_file)
     item["file"] = new_file
     return True
+
+
+def is_current_queue_item(queue, item):
+    """Return whether this exact item is still the head of the live queue."""
+    return bool(queue) and queue[0] is item
