@@ -204,6 +204,13 @@ async def skip(cli, message: Message, _, chat_id):
             image = None
         try:
             if not is_current_queue_item(db.get(chat_id) or [], track):
+                # Another skip/stop replaced this item while it was downloading.
+                # Do not leave an orphaned status message or an untracked file.
+                release_file(file_path)
+                try:
+                    await mystic.delete()
+                except Exception:
+                    pass
                 return
             await Nand.skip_stream(chat_id, file_path, video=status, image=image)
         except:
