@@ -75,8 +75,11 @@ async def put_queue(
     autoclean.append(file)
     if not forceplay:
         try:
+            from ShrutiMusic.utils.autoplay import AUTOPLAY, schedule_autoplay_fill
             from ShrutiMusic.utils.stream.prefetch import schedule_next_prefetch
 
+            if len(db.get(chat_id) or []) == 1 and AUTOPLAY.get(chat_id):
+                schedule_autoplay_fill(chat_id, put)
             schedule_next_prefetch(chat_id)
         except RuntimeError:
             # put_queue may be used outside a running event loop in tests/tools.
