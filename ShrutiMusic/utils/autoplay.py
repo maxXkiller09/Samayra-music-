@@ -80,6 +80,22 @@ def _artist_hint(title):
     return parts[0].strip() if len(parts) == 2 and parts[0].strip() else ""
 
 
+def _search_query(current_title):
+    """Add a small mood hint when the current title clearly signals a vibe."""
+    mood_terms = {
+        "sad": "sad heartbreak songs",
+        "romantic": "romantic love songs",
+        "party": "party dance songs",
+        "devotional": "devotional songs",
+        "lofi": "lofi chill songs",
+        "rap": "rap hip hop songs",
+    }
+    moods = _moods(current_title)
+    hint = next((mood_terms[mood] for mood in mood_terms if mood in moods), "")
+    query = f"songs like {_clean_title(current_title)} similar vibe"
+    return f"{query} {hint}".strip()
+
+
 def _score_candidate(current_title, candidate):
     """Rank results by mood/artist/word overlap and penalize near-duplicates."""
     title = candidate.get("title") or ""
@@ -149,7 +165,7 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
             return False
         # One focused query keeps end-of-track lookup lightweight. Rank the
         # returned pool locally instead of choosing an arbitrary first result.
-        query = f"songs like {current_title} similar vibe"
+        query = _search_query(current_title)
         # Never let a slow search hold the voice chat at the end of the queue.
         # If YouTube search stalls, autoplay safely gives up and playback can end.
         results = (
