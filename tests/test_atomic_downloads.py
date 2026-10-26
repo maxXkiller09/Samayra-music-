@@ -46,6 +46,7 @@ class AtomicDownloadTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = str(Path(directory) / "track.mp3")
             Path(path).write_bytes(b"valid-cache")
+            Path(path + ".part").write_bytes(b"stale-partial")
 
             result = await YOUTUBE._save_stream(
                 FakeResponse([], content_length=100), path, 10
