@@ -93,6 +93,8 @@ class AutoplayMatchingTests(unittest.TestCase):
 
 class AutoplayDisableTests(unittest.IsolatedAsyncioTestCase):
     async def test_disabling_autoplay_cancels_inflight_search(self):
+        if not hasattr(AutoplayMatchingTests, "module"):
+            AutoplayMatchingTests.setUpClass()
         module = AutoplayMatchingTests.module
 
         class FakeAutoplayDB:
