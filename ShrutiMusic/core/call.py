@@ -53,7 +53,7 @@ from ShrutiMusic.utils.database import (
     remove_active_video_chat,
     set_loop,
 )
-from ShrutiMusic.utils.autoplay import autoplay_fill
+from ShrutiMusic.utils.autoplay import AUTOPLAY, autoplay_fill, schedule_autoplay_fill
 from ShrutiMusic.utils.exceptions import AssistantErr
 from ShrutiMusic.utils.formatters import check_duration, seconds_to_min, speed_converter
 from ShrutiMusic.utils.inline.play import stream_markup
@@ -406,6 +406,10 @@ class Call(PyTgCalls):
                 except Exception:
                     return
         if check:
+            # When a manually queued track becomes the final queued item,
+            # start its similar-song search before it ends.
+            if len(check) == 1 and AUTOPLAY.get(chat_id):
+                schedule_autoplay_fill(chat_id, check[0])
             # Prepare the track after the next one while the next track's
             # existing prefetch (if any) finishes.
             schedule_next_prefetch(chat_id)
