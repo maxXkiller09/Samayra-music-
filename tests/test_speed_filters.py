@@ -1,6 +1,14 @@
+import importlib.util
+from pathlib import Path
 import unittest
 
-from ShrutiMusic.utils.stream.speed_filters import build_ffmpeg_speed_args
+
+ROOT = Path(__file__).resolve().parents[1]
+MODULE_PATH = ROOT / "ShrutiMusic" / "utils" / "stream" / "speed_filters.py"
+SPEC = importlib.util.spec_from_file_location("speed_filters_under_test", MODULE_PATH)
+SPEED_FILTERS = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(SPEED_FILTERS)
+build_ffmpeg_speed_args = SPEED_FILTERS.build_ffmpeg_speed_args
 
 
 class PlaybackSpeedFilterTests(unittest.TestCase):
