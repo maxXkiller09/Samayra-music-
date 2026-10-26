@@ -159,7 +159,8 @@ async def skip(cli, message: Message, _, chat_id):
         n, link = await YouTube.video(videoid, True)
         if n == 0:
             return await message.reply_text(_["admin_7"].format(title))
-        replace_queue_file(chat_id, queued, link)        try:
+        replace_queue_file(chat_id, queued, link)
+        try:
             image = await YouTube.thumbnail(videoid, True)
         except:
             image = None
