@@ -7,6 +7,7 @@ autoplay_db = mongodb.autoplay
 AUTOPLAY = {}  # chat_id -> bool (button ke liye sync cache)
 _recent = {}  # chat_id -> pichle vidid (repeat se bachne ke liye)
 _loaded = False
+_fill_tasks = {}  # chat_id -> active recommendation search task
 
 # Lightweight mood hints from titles; no extra API or model call required.
 _MOOD_WORDS = {
@@ -41,6 +42,15 @@ async def set_autoplay(chat_id, value: bool):
         )
     except Exception as e:
         print(f"[autoplay] save error: {e}")
+    if value:
+        try:
+            from ShrutiMusic.misc import db
+
+            queue = db.get(chat_id) or []
+            if len(queue) == 1:
+                schedule_autoplay_fill(chat_id, queue[0])
+        except Exception as e:
+            print(f"[autoplay] prefill schedule error: {type(e).__name__}: {e}")
 
 
 def _clean_title(title):
@@ -105,8 +115,8 @@ def _is_short(duration):
         return False
 
 
-async def autoplay_fill(chat_id, popped):
-    """Queue a relevant next track when the queue ends and autoplay is enabled."""
+async def _autoplay_fill_impl(chat_id, popped, proactive=False):
+    """Find and queue a relevant track, optionally while the current track plays."""
     try:
         if not popped or not AUTOPLAY.get(chat_id):
             return False
@@ -115,6 +125,13 @@ async def autoplay_fill(chat_id, popped):
         from ShrutiMusic import app
         from ShrutiMusic.misc import db
         from ShrutiMusic.utils.stream.queue import put_queue
+
+        current_queue = db.get(chat_id) or []
+        if proactive:
+            if len(current_queue) != 1 or current_queue[0] is not popped:
+                return False
+        elif current_queue:
+            return False
 
         seen = _recent.setdefault(chat_id, [])
         if popped.get("vidid"):
@@ -128,6 +145,23 @@ async def autoplay_fill(chat_id, popped):
         # returned pool locally instead of choosing an arbitrary first result.
         query = f"songs like {current_title} similar vibe"
         results = (await VideosSearch(query, limit=15).next()).get("result", [])
+        # If the current song ended while search was running, allow the result
+        # only while the voice chat is still active and no manual track replaced it.
+        current_queue = db.get(chat_id) or []
+        if proactive:
+            if current_queue and not (
+                len(current_queue) == 1 and current_queue[0] is popped
+            ):
+                return False
+            if not current_queue:
+                from ShrutiMusic.utils.database import is_active_chat
+
+                if not await is_active_chat(chat_id):
+                    return False
+        elif current_queue:
+            return False
+        if not AUTOPLAY.get(chat_id):
+            return False
         pool = [
             item for item in results
             if item.get("id")
@@ -162,6 +196,43 @@ async def autoplay_fill(chat_id, popped):
     except Exception as e:
         print(f"[autoplay] fill error: {type(e).__name__}: {e}")
         return False
+
+
+def _clear_fill_task(chat_id, task):
+    if _fill_tasks.get(chat_id) is task:
+        _fill_tasks.pop(chat_id, None)
+
+
+def schedule_autoplay_fill(chat_id, current_track):
+    """Start finding one similar song early, while the current track is playing."""
+    if not current_track or not AUTOPLAY.get(chat_id):
+        return None
+    existing = _fill_tasks.get(chat_id)
+    if existing and not existing.done():
+        return existing
+    task = asyncio.create_task(
+        _autoplay_fill_impl(chat_id, current_track, proactive=True)
+    )
+    _fill_tasks[chat_id] = task
+    task.add_done_callback(lambda done: _clear_fill_task(chat_id, done))
+    return task
+
+
+async def autoplay_fill(chat_id, popped):
+    """At queue end, wait for an early recommendation or perform a fallback search."""
+    existing = _fill_tasks.get(chat_id)
+    if existing and existing is not asyncio.current_task():
+        try:
+            return await asyncio.shield(existing)
+        except Exception:
+            return False
+
+    task = asyncio.create_task(_autoplay_fill_impl(chat_id, popped))
+    _fill_tasks[chat_id] = task
+    try:
+        return await task
+    finally:
+        _clear_fill_task(chat_id, task)
 
 
 try:
