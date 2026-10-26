@@ -140,25 +140,28 @@ def _safe_public_download_url(value: str) -> bool:
 
 
 async def _save_stream(resp, file_path: str, max_bytes: int) -> bool:
-    """Stream a download with a size cap and remove partial files on failure."""
+    """Stream to a temporary file and atomically publish only complete downloads."""
+    temp_path = f"{file_path}.part"
     try:
         length = resp.headers.get("Content-Length")
         if length and int(length) > max_bytes:
-            if os.path.exists(file_path):
-                os.remove(file_path)
             return False
         written = 0
-        with open(file_path, "wb") as f:
+        with open(temp_path, "wb") as f:
             async for chunk in resp.content.iter_chunked(131072):
                 written += len(chunk)
                 if written > max_bytes:
                     raise ValueError("download exceeds configured size limit")
                 f.write(chunk)
-        return written > 0 and os.path.getsize(file_path) > 0
+        if written <= 0 or os.path.getsize(temp_path) <= 0:
+            os.remove(temp_path)
+            return False
+        os.replace(temp_path, file_path)
+        return True
     except Exception:
         try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
         except OSError:
             pass
         return False
