@@ -5,10 +5,15 @@ from pyrogram import filters
 
 load_dotenv()
 
-def _required_int(name):
+def _required_env(name):
     value = os.getenv(name)
     if value is None or not value.strip():
         raise RuntimeError(f"Missing required environment variable: {name}")
+    return value.strip()
+
+
+def _required_int(name):
+    value = _required_env(name)
     try:
         return int(value)
     except ValueError as exc:
@@ -23,13 +28,13 @@ def _env_bool(name, default=False):
 
 
 API_ID = _required_int("API_ID")
-API_HASH = os.getenv("API_HASH")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+API_HASH = _required_env("API_HASH")
+BOT_TOKEN = _required_env("BOT_TOKEN")
 OWNER_ID = _required_int("OWNER_ID")
 OWNER_USERNAME = os.getenv("OWNER_USERNAME", "WTF_WhyMeeh")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "ShrutixMusicBot")
 
-MONGO_DB_URI = os.getenv("MONGO_DB_URI", None)
+MONGO_DB_URI = _required_env("MONGO_DB_URI")
 LOG_GROUP_ID = _required_int("LOG_GROUP_ID")
 HEROKU_APP_NAME = os.getenv("HEROKU_APP_NAME")
 HEROKU_API_KEY = os.getenv("HEROKU_API_KEY")
