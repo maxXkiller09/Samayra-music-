@@ -136,13 +136,18 @@ class Call(PyTgCalls):
 
     async def stop_stream(self, chat_id: int):
         assistant = await group_assistant(self, chat_id)
+        queued = list(db.get(chat_id) or [])
         try:
             await _clear_(chat_id)
             await assistant.leave_group_call(chat_id)
         except:
             pass
+        finally:
+            for item in queued:
+                await auto_clean(item)
 
     async def stop_stream_force(self, chat_id: int):
+        queued = list(db.get(chat_id) or [])
         try:
             if config.STRING1:
                 await self.one.leave_group_call(chat_id)
@@ -172,6 +177,9 @@ class Call(PyTgCalls):
             await _clear_(chat_id)
         except:
             pass
+        finally:
+            for item in queued:
+                await auto_clean(item)
 
     async def speedup_stream(self, chat_id: int, file_path, speed, playing):
         assistant = await group_assistant(self, chat_id)
@@ -236,9 +244,11 @@ class Call(PyTgCalls):
 
     async def force_stop_stream(self, chat_id: int):
         assistant = await group_assistant(self, chat_id)
+        popped = None
         try:
             check = db.get(chat_id)
-            check.pop(0)
+            if check:
+                popped = check.pop(0)
         except:
             pass
         await remove_active_video_chat(chat_id)
@@ -247,6 +257,8 @@ class Call(PyTgCalls):
             await assistant.leave_group_call(chat_id)
         except:
             pass
+        if popped:
+            await auto_clean(popped)
 
     async def skip_stream(
         self,
