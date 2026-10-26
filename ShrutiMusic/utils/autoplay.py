@@ -250,8 +250,19 @@ async def autoplay_fill(chat_id, popped):
     existing = _fill_tasks.get(chat_id)
     if existing and existing is not asyncio.current_task():
         try:
-            if await asyncio.shield(existing):
+            # The proactive search should normally finish while the current
+            # track is playing. At queue end, wait briefly only; never make
+            # the voice chat sit silent for the full search timeout.
+            if await asyncio.wait_for(asyncio.shield(existing), timeout=2):
                 return True
+        except asyncio.TimeoutError:
+            try:
+                from ShrutiMusic.misc import db
+
+                if not db.get(chat_id):
+                    return False
+            except Exception:
+                return False
         except Exception:
             pass
         try:
