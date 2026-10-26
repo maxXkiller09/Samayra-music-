@@ -58,6 +58,7 @@ from ShrutiMusic.utils.exceptions import AssistantErr
 from ShrutiMusic.utils.formatters import check_duration, seconds_to_min, speed_converter
 from ShrutiMusic.utils.inline.play import stream_markup
 from ShrutiMusic.utils.stream.autoclear import auto_clean
+from ShrutiMusic.utils.stream.speed_filters import build_ffmpeg_speed_args
 from ShrutiMusic.utils.thumbnails import gen_thumb
 from strings import get_string
 
@@ -173,38 +174,30 @@ class Call(PyTgCalls):
 
     async def speedup_stream(self, chat_id: int, file_path, speed, playing):
         assistant = await group_assistant(self, chat_id)
-        if str(speed) != str("1.0"):
+        if str(speed) != "1.0":
             base = os.path.basename(file_path)
             chatdir = os.path.join(os.getcwd(), "playback", str(speed))
-            if not os.path.isdir(chatdir):
-                os.makedirs(chatdir)
+            os.makedirs(chatdir, exist_ok=True)
             out = os.path.join(chatdir, base)
-            if not os.path.isfile(out):
-                if str(speed) == str("0.5"):
-                    vs = 2.0
-                if str(speed) == str("0.75"):
-                    vs = 1.35
-                if str(speed) == str("1.5"):
-                    vs = 0.68
-                if str(speed) == str("2.0"):
-                    vs = 0.5
-                proc = await asyncio.create_subprocess_shell(
-                    cmd=(
-                        "ffmpeg "
-                        "-i "
-                        f"{file_path} "
-                        "-filter:v "
-                        f"setpts={vs}*PTS "
-                        "-filter:a "
-                        f"atempo={speed} "
-                        f"{out}"
-                    ),
-                    stdin=asyncio.subprocess.PIPE,
+            if not os.path.isfile(out) or os.path.getsize(out) == 0:
+                try:
+                    if os.path.exists(out):
+                        os.remove(out)
+                except OSError:
+                    pass
+                is_video = playing[0]["streamtype"] == "video"
+                args = build_ffmpeg_speed_args(file_path, out, speed, is_video)
+                proc = await asyncio.create_subprocess_exec(
+                    "ffmpeg",
+                    *args,
+                    stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                await proc.communicate()
-            else:
-                pass
+                _, stderr = await proc.communicate()
+                if proc.returncode != 0 or not os.path.isfile(out) or os.path.getsize(out) == 0:
+                    detail = (stderr or b"").decode("utf-8", errors="replace")[-300:]
+                    LOGGER(__name__).warning("FFmpeg speed conversion failed: %s", detail)
+                    raise AssistantErr("Playback speed conversion failed")
         else:
             out = file_path
         dur = await asyncio.get_event_loop().run_in_executor(None, check_duration, out)
