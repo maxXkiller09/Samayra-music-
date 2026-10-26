@@ -31,7 +31,7 @@ from ShrutiMusic.utils.autoplay import autoplay_fill
 from ShrutiMusic.utils.database import get_loop
 from ShrutiMusic.utils.decorators import AdminRightsCheck
 from ShrutiMusic.utils.inline import close_markup, stream_markup
-from ShrutiMusic.utils.stream.autoclear import auto_clean
+from ShrutiMusic.utils.stream.autoclear import auto_clean, release_file
 from ShrutiMusic.utils.stream.queue import replace_queue_file
 from ShrutiMusic.utils.stream.prefetch import wait_for_prefetch
 from ShrutiMusic.utils.thumbnails import gen_thumb
@@ -137,6 +137,9 @@ async def skip(cli, message: Message, _, chat_id):
     if exis:
         db[chat_id][0]["dur"] = exis
         db[chat_id][0]["seconds"] = check[0]["old_second"]
+        old_speed_path = db[chat_id][0].get("speed_path")
+        if old_speed_path:
+            release_file(old_speed_path)
         db[chat_id][0]["speed_path"] = None
         db[chat_id][0]["speed"] = 1.0
     if "live_" in queued:
