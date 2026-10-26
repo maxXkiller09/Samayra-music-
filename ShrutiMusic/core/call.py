@@ -422,9 +422,8 @@ class Call(PyTgCalls):
             if "live_" in queued:
                 n, link = await YouTube.video(videoid, True)
                 if n == 0:
-                    return await app.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
+                    return await self._skip_failed_queued_track(
+                        client, chat_id, original_chat_id, _["call_6"]
                     )
                 replace_queue_file(chat_id, queued, link)
                 if video:
