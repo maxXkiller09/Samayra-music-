@@ -26,6 +26,12 @@ from typing import Union
 from ShrutiMusic.misc import db
 from ShrutiMusic.utils.formatters import check_duration, seconds_to_min
 from config import autoclean, time_to_seconds
+from ShrutiMusic.utils.stream.queue_files import replace_tracked_file
+
+
+def replace_queue_file(chat_id, old_file, new_file):
+    """Update the current queue item and cleanup tracker after downloading a placeholder."""
+    return replace_tracked_file(db.get(chat_id), autoclean, old_file, new_file)
 
 
 async def put_queue(

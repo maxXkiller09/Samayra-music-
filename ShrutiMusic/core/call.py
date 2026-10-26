@@ -59,6 +59,7 @@ from ShrutiMusic.utils.formatters import check_duration, seconds_to_min, speed_c
 from ShrutiMusic.utils.inline.play import stream_markup
 from ShrutiMusic.utils.stream.autoclear import auto_clean
 from ShrutiMusic.utils.stream.speed_filters import build_ffmpeg_speed_args
+from ShrutiMusic.utils.stream.queue import replace_queue_file
 from ShrutiMusic.utils.thumbnails import gen_thumb
 from strings import get_string
 
@@ -391,6 +392,7 @@ class Call(PyTgCalls):
                         original_chat_id,
                         text=_["call_6"],
                     )
+                replace_queue_file(chat_id, queued, link)
                 if video:
                     stream = AudioVideoPiped(
                         link,
@@ -437,6 +439,11 @@ class Call(PyTgCalls):
                     return await mystic.edit_text(
                         _["call_6"], disable_web_page_preview=True
                     )
+                if not file_path:
+                    return await mystic.edit_text(
+                        _["call_6"], disable_web_page_preview=True
+                    )
+                replace_queue_file(chat_id, queued, file_path)
                 if video:
                     stream = AudioVideoPiped(
                         file_path,
