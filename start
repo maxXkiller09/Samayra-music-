@@ -4,6 +4,15 @@ set -e
 # Render Web Services must bind to the injected PORT.
 python3 health_server.py &
 HEALTH_PID=$!
-trap 'kill "$HEALTH_PID" 2>/dev/null || true' EXIT
 
-exec python3 -m ShrutiMusic
+# Keep the bot as a supervised child: if it exits, this script exits too,
+# so the health server cannot keep Render reporting a dead bot as healthy.
+python3 -m ShrutiMusic &
+BOT_PID=$!
+
+cleanup() {
+  kill "$BOT_PID" "$HEALTH_PID" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+wait "$BOT_PID"
