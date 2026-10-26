@@ -145,6 +145,11 @@ async def _save_stream(resp, file_path: str, max_bytes: int) -> bool:
     try:
         length = resp.headers.get("Content-Length")
         if length and int(length) > max_bytes:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except OSError:
+                pass
             return False
         written = 0
         with open(temp_path, "wb") as f:
