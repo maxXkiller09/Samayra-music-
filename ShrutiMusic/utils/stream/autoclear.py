@@ -25,19 +25,34 @@ import os
 from config import autoclean
 
 
-async def auto_clean(popped):
+def release_file(path):
+    """Release one queued reference and delete the file when no item uses it."""
+    if not path:
+        return
+
     try:
-        rem = popped["file"]
-        autoclean.remove(rem)
-        count = autoclean.count(rem)
-        if count == 0:
-            if not os.path.basename(str(rem)).startswith(("vid_", "live_", "index_")):
-                try:
-                    os.remove(rem)
-                except:
-                    pass
-    except:
+        autoclean.remove(path)
+    except ValueError:
         pass
+
+    if autoclean.count(path) == 0:
+        if os.path.basename(str(path)).startswith(("vid_", "live_", "index_")):
+            return
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+async def auto_clean(popped):
+    if not popped:
+        return
+
+    rem = popped.get("file")
+    speed_path = popped.get("speed_path")
+    release_file(rem)
+    if speed_path and speed_path != rem:
+        release_file(speed_path)
 
 
 # ©️ Copyright Reserved - @NoxxOP  Nand Yaduwanshi
