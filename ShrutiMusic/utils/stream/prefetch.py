@@ -5,7 +5,6 @@ for small hosts such as Render Free Web Service.
 """
 
 import asyncio
-import os
 
 from config import autoclean
 from ShrutiMusic.misc import db
@@ -41,17 +40,11 @@ async def _prefetch_item(chat_id, item):
             return
 
         current_queue = db.get(chat_id) or []
-        replaced = replace_tracked_queue_item(
+        # If stop/skip removed the item during download, leave the completed
+        # file in the downloader cache for safe reuse; never resurrect the item.
+        replace_tracked_queue_item(
             current_queue, autoclean, item, old_file, file_path
         )
-        if not replaced and file_path not in autoclean:
-            # A stop/skip may have removed the item while the download ran.
-            # Do not leave an untracked download behind, but keep shared cache
-            # files that are still referenced by another queue entry.
-            try:
-                os.remove(file_path)
-            except OSError:
-                pass
     except asyncio.CancelledError:
         raise
     except Exception as exc:
