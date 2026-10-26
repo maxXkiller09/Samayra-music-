@@ -33,6 +33,7 @@ from ShrutiMusic.utils.decorators import AdminRightsCheck
 from ShrutiMusic.utils.inline import close_markup, stream_markup
 from ShrutiMusic.utils.stream.autoclear import auto_clean
 from ShrutiMusic.utils.stream.queue import replace_queue_file
+from ShrutiMusic.utils.stream.prefetch import wait_for_prefetch
 from ShrutiMusic.utils.thumbnails import gen_thumb
 from config import BANNED_USERS
 
@@ -115,6 +116,16 @@ async def skip(cli, message: Message, _, chat_id):
                 return await Nand.stop_stream(chat_id)
             except:
                 return
+    # If the next track is already being prefetched, reuse that download rather
+    # than starting a second download for the same video during /skip.
+    await wait_for_prefetch(chat_id, check[0])
+    check = db.get(chat_id) or []
+    if not check:
+        try:
+            await Nand.stop_stream(chat_id)
+        except Exception:
+            pass
+        return
     queued = check[0]["file"]
     title = (check[0]["title"]).title()
     user = check[0]["by"]
