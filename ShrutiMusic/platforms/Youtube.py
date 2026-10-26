@@ -222,9 +222,9 @@ async def _api_download_unlocked(link: str, media: str, ext: str, timeout: int):
                 try:
                     data = await resp.json(content_type=None)
                 except Exception as je:
-                    print(f"[API] json error: {je}")
+                    print(f"[API] JSON parse failed ({type(je).__name__})")
                     return None
-            print(f"[API] json response: {str(data)[:300]}")
+            print(f"[API] JSON response received (type={type(data).__name__})")
             file_url = _find_link(data)
             if not file_url:
                 print("[API] response me download link nahi mila")
@@ -240,7 +240,7 @@ async def _api_download_unlocked(link: str, media: str, ext: str, timeout: int):
                     return file_path
         return None
     except Exception as ae:
-        print(f"[API] exception: {type(ae).__name__}: {ae}")
+        print(f"[API] request failed ({type(ae).__name__})")
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
