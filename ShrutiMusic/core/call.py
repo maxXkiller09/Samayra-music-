@@ -57,7 +57,7 @@ from ShrutiMusic.utils.autoplay import autoplay_fill
 from ShrutiMusic.utils.exceptions import AssistantErr
 from ShrutiMusic.utils.formatters import check_duration, seconds_to_min, speed_converter
 from ShrutiMusic.utils.inline.play import stream_markup
-from ShrutiMusic.utils.stream.autoclear import auto_clean
+from ShrutiMusic.utils.stream.autoclear import auto_clean, release_file
 from ShrutiMusic.utils.stream.speed_filters import build_ffmpeg_speed_args
 from ShrutiMusic.utils.stream.queue import replace_queue_file
 from ShrutiMusic.utils.thumbnails import gen_thumb
@@ -232,15 +232,23 @@ class Call(PyTgCalls):
         else:
             raise AssistantErr("Umm")
         if str(db[chat_id][0]["file"]) == str(file_path):
-            exis = (playing[0]).get("old_dur")
+            item = db[chat_id][0]
+            exis = item.get("old_dur")
             if not exis:
-                db[chat_id][0]["old_dur"] = db[chat_id][0]["dur"]
-                db[chat_id][0]["old_second"] = db[chat_id][0]["seconds"]
-            db[chat_id][0]["played"] = con_seconds
-            db[chat_id][0]["dur"] = duration
-            db[chat_id][0]["seconds"] = dur
-            db[chat_id][0]["speed_path"] = out
-            db[chat_id][0]["speed"] = speed
+                item["old_dur"] = item["dur"]
+                item["old_second"] = item["seconds"]
+            old_speed_path = item.get("speed_path")
+            new_speed_path = out if str(out) != str(file_path) else None
+            if old_speed_path != new_speed_path:
+                if old_speed_path:
+                    release_file(old_speed_path)
+                if new_speed_path:
+                    config.autoclean.append(new_speed_path)
+            item["played"] = con_seconds
+            item["dur"] = duration
+            item["seconds"] = dur
+            item["speed_path"] = new_speed_path
+            item["speed"] = speed
 
     async def force_stop_stream(self, chat_id: int):
         assistant = await group_assistant(self, chat_id)
@@ -416,6 +424,9 @@ class Call(PyTgCalls):
             if exis:
                 db[chat_id][0]["dur"] = exis
                 db[chat_id][0]["seconds"] = check[0]["old_second"]
+                old_speed_path = db[chat_id][0].get("speed_path")
+                if old_speed_path:
+                    release_file(old_speed_path)
                 db[chat_id][0]["speed_path"] = None
                 db[chat_id][0]["speed"] = 1.0
             video = True if str(streamtype) == "video" else False
