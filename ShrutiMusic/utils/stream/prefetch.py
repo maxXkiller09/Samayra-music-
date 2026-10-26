@@ -59,6 +59,17 @@ async def _prefetch_item(chat_id, item):
             _TASKS.pop(key, None)
 
 
+def _reschedule_if_next_changed(chat_id, attempted_item, _task):
+    """Retry scheduling only if the queue's next item changed while busy.
+
+    Do not immediately retry a failed download for the same item; that could
+    create an unbounded background-download loop on a small host.
+    """
+    queue = db.get(chat_id) or []
+    if len(queue) >= 2 and queue[1] is not attempted_item:
+        schedule_next_prefetch(chat_id)
+
+
 def schedule_next_prefetch(chat_id):
     """Start preparing queue[1] if it is a deferred YouTube item."""
     queue = db.get(chat_id) or []
@@ -70,6 +81,8 @@ def schedule_next_prefetch(chat_id):
         return None
 
     # Bound resource use: never run more than one prefetch download per chat.
+    # The active task's completion callback will schedule the new queue[1] if
+    # the queue changed while that task occupied this chat's prefetch slot.
     for (key, task) in list(_TASKS.items()):
         if key[0] == chat_id and not task.done():
             return task
@@ -77,6 +90,9 @@ def schedule_next_prefetch(chat_id):
     key = (chat_id, id(item))
     task = asyncio.create_task(_prefetch_item(chat_id, item))
     _TASKS[key] = task
+    task.add_done_callback(
+        lambda done: _reschedule_if_next_changed(chat_id, item, done)
+    )
     return task
 
 
