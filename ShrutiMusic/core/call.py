@@ -60,6 +60,7 @@ from ShrutiMusic.utils.inline.play import stream_markup
 from ShrutiMusic.utils.stream.autoclear import auto_clean, release_file
 from ShrutiMusic.utils.stream.speed_filters import build_ffmpeg_speed_args
 from ShrutiMusic.utils.stream.queue import replace_queue_file
+from ShrutiMusic.utils.stream.prefetch import schedule_next_prefetch, wait_for_prefetch
 from ShrutiMusic.utils.thumbnails import gen_thumb
 from strings import get_string
 
@@ -404,6 +405,12 @@ class Call(PyTgCalls):
                     return await client.leave_group_call(chat_id)
                 except Exception:
                     return
+        if check:
+            # Prepare the track after the next one while the next track's
+            # existing prefetch (if any) finishes.
+            schedule_next_prefetch(chat_id)
+            await wait_for_prefetch(chat_id, check[0])
+            check = db.get(chat_id)
         if not check:
             await _clear_(chat_id)
             try:
