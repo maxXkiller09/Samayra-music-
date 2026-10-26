@@ -33,6 +33,7 @@ from ShrutiMusic.utils.decorators import AdminRightsCheck
 from ShrutiMusic.utils.inline import close_markup, stream_markup
 from ShrutiMusic.utils.stream.autoclear import auto_clean, release_file
 from ShrutiMusic.utils.stream.queue import replace_queue_file
+from ShrutiMusic.utils.stream.queue_files import is_current_queue_item
 from ShrutiMusic.utils.stream.prefetch import schedule_next_prefetch, wait_for_prefetch
 from ShrutiMusic.utils.thumbnails import gen_thumb
 from config import BANNED_USERS
@@ -137,6 +138,7 @@ async def skip(cli, message: Message, _, chat_id):
         except Exception:
             pass
         return
+    track = check[0]
     queued = check[0]["file"]
     title = (check[0]["title"]).title()
     user = check[0]["by"]
@@ -163,6 +165,8 @@ async def skip(cli, message: Message, _, chat_id):
         except:
             image = None
         try:
+            if not is_current_queue_item(db.get(chat_id) or [], track):
+                return
             await Nand.skip_stream(chat_id, link, video=status, image=image)
         except:
             return await message.reply_text(_["call_6"])
@@ -199,6 +203,8 @@ async def skip(cli, message: Message, _, chat_id):
         except:
             image = None
         try:
+            if not is_current_queue_item(db.get(chat_id) or [], track):
+                return
             await Nand.skip_stream(chat_id, file_path, video=status, image=image)
         except:
             return await mystic.edit_text(_["call_6"])
@@ -219,6 +225,8 @@ async def skip(cli, message: Message, _, chat_id):
         await mystic.delete()
     elif "index_" in queued:
         try:
+            if not is_current_queue_item(db.get(chat_id) or [], track):
+                return
             await Nand.skip_stream(chat_id, videoid, video=status)
         except:
             return await message.reply_text(_["call_6"])
@@ -241,6 +249,8 @@ async def skip(cli, message: Message, _, chat_id):
             except:
                 image = None
         try:
+            if not is_current_queue_item(db.get(chat_id) or [], track):
+                return
             await Nand.skip_stream(chat_id, queued, video=status, image=image)
         except:
             return await message.reply_text(_["call_6"])
