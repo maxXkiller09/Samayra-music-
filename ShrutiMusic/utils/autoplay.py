@@ -44,9 +44,9 @@ async def set_autoplay(chat_id, value: bool):
 
 
 def _clean_title(title):
-    t = re.sub(r"[\\(\\[\\{].*?[\\)\\]\\}]", " ", title or "")
-    t = re.sub(r"(?i)\\b(official|video|audio|lyrics?|lyrical|full|song|hd|4k|mp3)\\b", " ", t)
-    return re.sub(r"\\s+", " ", t).strip()[:80]
+    t = re.sub(r"[\(\[\{].*?[\)\]\}]", " ", title or "")
+    t = re.sub(r"(?i)\b(official|video|audio|lyrics?|lyrical|full|song|hd|4k|mp3)\b", " ", t)
+    return re.sub(r"\s+", " ", t).strip()[:80]
 
 
 def _tokens(text):
@@ -60,7 +60,7 @@ def _moods(text):
 
 def _artist_hint(title):
     """Use an explicit 'artist - track' title prefix when available."""
-    parts = re.split(r"\\s[-–—]\\s", _clean_title(title), maxsplit=1)
+    parts = re.split(r"\s[-–—]\s", _clean_title(title), maxsplit=1)
     return parts[0].strip() if len(parts) == 2 and parts[0].strip() else ""
 
 
