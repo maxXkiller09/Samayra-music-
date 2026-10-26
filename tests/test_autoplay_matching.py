@@ -1,3 +1,4 @@
+import asyncio
 import importlib.util
 from pathlib import Path
 import sys
@@ -88,6 +89,30 @@ class AutoplayMatchingTests(unittest.TestCase):
                 with patch.object(self.module, "schedule_autoplay_fill") as schedule:
                     self.module._reschedule_if_track_changed(-1002, current_track, None)
         schedule.assert_not_called()
+
+
+class AutoplayDisableTests(unittest.IsolatedAsyncioTestCase):
+    async def test_disabling_autoplay_cancels_inflight_search(self):
+        if not hasattr(AutoplayMatchingTests, "module"):
+            AutoplayMatchingTests.setUpClass()
+        module = AutoplayMatchingTests.module
+
+        class FakeAutoplayDB:
+            async def update_one(self, *args, **kwargs):
+                return None
+
+        module.autoplay_db = FakeAutoplayDB()
+        chat_id = -4242
+        task = asyncio.create_task(asyncio.sleep(60))
+        module._fill_tasks[chat_id] = task
+        module.AUTOPLAY[chat_id] = True
+
+        await module.set_autoplay(chat_id, False)
+        await asyncio.sleep(0)
+
+        self.assertTrue(task.cancelled())
+        self.assertNotIn(chat_id, module._fill_tasks)
+        self.assertFalse(module.AUTOPLAY[chat_id])
 
 
 if __name__ == "__main__":

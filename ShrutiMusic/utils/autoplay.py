@@ -36,6 +36,12 @@ async def load_autoplay():
 
 async def set_autoplay(chat_id, value: bool):
     AUTOPLAY[chat_id] = value
+    if not value:
+        # Stop wasting search/download-related work once autoplay is disabled.
+        # Remove the slot first so a quick re-enable can schedule a fresh task.
+        task = _fill_tasks.pop(chat_id, None)
+        if task and not task.done():
+            task.cancel()
     try:
         await autoplay_db.update_one(
             {"chat_id": chat_id}, {"$set": {"enabled": value}}, upsert=True
