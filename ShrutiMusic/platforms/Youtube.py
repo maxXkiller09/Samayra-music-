@@ -2,6 +2,7 @@ import asyncio
 import ipaddress
 import os
 import re
+import weakref
 from urllib.parse import urlparse
 from typing import Union
 import yt_dlp
@@ -163,7 +164,7 @@ async def _save_stream(resp, file_path: str, max_bytes: int) -> bool:
         return False
 
 
-async def _api_download(link: str, media: str, ext: str, timeout: int):
+async def _api_download_unlocked(link: str, media: str, ext: str, timeout: int):
     video_id = _extract_video_id(link)
     if not video_id or len(video_id) < 3:
         return None
@@ -238,6 +239,28 @@ async def _api_download(link: str, media: str, ext: str, timeout: int):
             except Exception:
                 pass
         return None
+
+
+
+# Share one in-flight download per media ID/type. Weak values allow idle locks
+# to be garbage-collected instead of retaining every song ever requested.
+_DOWNLOAD_LOCKS = weakref.WeakValueDictionary()
+
+
+async def _api_download(link: str, media: str, ext: str, timeout: int):
+    video_id = _extract_video_id(link)
+    if not video_id:
+        return None
+    key = (video_id, media, ext)
+    lock = _DOWNLOAD_LOCKS.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _DOWNLOAD_LOCKS[key] = lock
+    async with lock:
+        # The inner function re-checks the cache after acquiring the lock, so
+        # concurrent requests reuse the first completed file instead of
+        # truncating/writing the same destination at the same time.
+        return await _api_download_unlocked(link, media, ext, timeout)
 
 
 async def download_song(link: str) -> str:
