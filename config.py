@@ -32,7 +32,7 @@ API_HASH = _required_env("API_HASH")
 BOT_TOKEN = _required_env("BOT_TOKEN")
 OWNER_ID = _required_int("OWNER_ID")
 OWNER_USERNAME = os.getenv("OWNER_USERNAME", "WTF_WhyMeeh")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "ShrutixMusicBot")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "Yuvikamusic_bot")
 
 MONGO_DB_URI = _required_env("MONGO_DB_URI")
 LOG_GROUP_ID = _required_int("LOG_GROUP_ID")
