@@ -13,6 +13,13 @@ spec.loader.exec_module(queue_files)
 
 
 class PrefetchQueueReplacementTests(unittest.TestCase):
+    def test_current_queue_guard_requires_same_head_object(self):
+        current = {"file": "current.mp3"}
+        replacement = {"file": "replacement.mp3"}
+        self.assertTrue(queue_files.is_current_queue_item([current], current))
+        self.assertFalse(queue_files.is_current_queue_item([replacement], current))
+        self.assertFalse(queue_files.is_current_queue_item([], current))
+
     def test_prefetched_file_replaces_only_the_same_live_queue_item(self):
         item = {"file": "vid_abc", "vidid": "abc"}
         queue = [{"file": "current.mp3"}, item]
