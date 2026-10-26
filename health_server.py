@@ -10,7 +10,7 @@ from aiohttp import web
 
 
 async def health(_request):
-    return web.json_response({"status": "ok", "service": "samayra-music"})
+    return web.json_response({"status": "ok", "service": "yuvika-music"})
 
 
 async def main():
