@@ -10,6 +10,7 @@ from pyrogram.enums import MessageEntityType
 from pyrogram.types import Message
 from py_yt import VideosSearch, Playlist
 import aiohttp
+import aiofiles
 
 # ---------------------------------------------------------------------------
 # Generic downloader API (koi bhi API chalegi, sirf .env / Render env me set karo)
@@ -157,12 +158,12 @@ async def _save_stream(resp, file_path: str, max_bytes: int) -> bool:
                 pass
             return False
         written = 0
-        with open(temp_path, "wb") as f:
+        async with aiofiles.open(temp_path, "wb") as f:
             async for chunk in resp.content.iter_chunked(131072):
                 written += len(chunk)
                 if written > max_bytes:
                     raise ValueError("download exceeds configured size limit")
-                f.write(chunk)
+                await f.write(chunk)
         if written <= 0 or os.path.getsize(temp_path) <= 0:
             os.remove(temp_path)
             return False
