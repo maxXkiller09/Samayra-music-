@@ -206,6 +206,9 @@ async def setstart_callback(_, query):
     await query.answer()
     lock = _locks.setdefault(OWNER_ID, asyncio.Lock())
     async with lock:
+        # Re-check after acquiring the lock so two simultaneous callbacks cannot reuse a stale draft.
+        if _drafts.get(OWNER_ID) is not draft or draft.get("token") != token:
+            return
         if action in {"text", "image"}:
             draft["mode"] = action
             _rotate(draft)
