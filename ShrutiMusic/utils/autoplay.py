@@ -163,7 +163,7 @@ def _candidate_is_duplicate(current_title, candidate, queued_identities, recent_
     title = candidate.get("title") or ""
     if not title or _is_alternate_version(title):
         return True
-    identity = _canonical_identity(title, _candidate_artist(candidate))
+    identity = _canonical_identity(title, _artist_hint(title))
     current_identity = _canonical_identity(current_title, _artist_hint(current_title))
     if identity and identity == current_identity:
         return True
@@ -209,7 +209,7 @@ def _score_candidate(current_title, candidate):
     if language and language.lower() in title.lower():
         score += 2
     artist = _artist_hint(current_title)
-    candidate_artist = _candidate_artist(candidate)
+    candidate_artist = _artist_hint(title)
     if artist and candidate_artist and artist.casefold() == candidate_artist.casefold():
         score -= 2
     duration = str(candidate.get("duration") or "")
