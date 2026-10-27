@@ -2,6 +2,7 @@ import asyncio
 import importlib.util
 from pathlib import Path
 import sys
+import time
 import types
 import unittest
 from unittest.mock import patch
@@ -22,6 +23,38 @@ class AutoplayMatchingTests(unittest.TestCase):
             )
             cls.module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(cls.module)
+
+    def test_search_cache_is_bounded_and_expires(self):
+        module = self.module
+        module._search_cache.clear()
+        module._search_cache["old"] = (time.monotonic() - 1, [{"id": "x", "title": "x", "duration": "3:00"}])
+        with patch.object(module, "_fetch_search_results", return_value=None):
+            # Expired cache entry is discarded before a fresh search is attempted.
+            self.assertNotIn("old", module._search_cache)
+        module._search_cache.clear()
+        module._SEARCH_CACHE_MAX = 2
+        try:
+            for key in ("a", "b", "c"):
+                module._search_cache[key] = (time.monotonic() + 30, [])
+                while len(module._search_cache) > module._SEARCH_CACHE_MAX:
+                    module._search_cache.popitem(last=False)
+            self.assertEqual(list(module._search_cache), ["b", "c"])
+        finally:
+            module._SEARCH_CACHE_MAX = 64
+            module._search_cache.clear()
+
+    def test_recent_history_is_bounded_by_chat_count(self):
+        module = self.module
+        module._recent.clear()
+        module._RECENT_CHAT_MAX = 2
+        try:
+            module._recent_for(1)
+            module._recent_for(2)
+            module._recent_for(3)
+            self.assertEqual(list(module._recent), [2, 3])
+        finally:
+            module._RECENT_CHAT_MAX = 256
+            module._recent.clear()
 
     def test_title_cleanup_removes_upload_noise(self):
         self.assertEqual(
