@@ -110,7 +110,7 @@ class SetStartImageValidationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.source = PLUGIN_PATH.read_text(encoding="utf-8")
-        cls.validate = _validator()
+        cls.validate = staticmethod(_validator())
 
     def test_valid_telegram_jpeg_is_accepted(self):
         self.assertEqual(self.validate(_image_bytes("JPEG")), "JPEG")
