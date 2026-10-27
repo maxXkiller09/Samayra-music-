@@ -7,6 +7,7 @@ from py_yt import VideosSearch
 import config
 from ShrutiMusic import app
 from ShrutiMusic.misc import _boot_
+from ShrutiMusic.utils.welcome_settings import get_start_image
 from ShrutiMusic.plugins.sudo.sudoers import sudoers_list
 from ShrutiMusic.utils.database import (
     add_served_chat,
@@ -34,7 +35,7 @@ async def start_pm(client, message: Message, _):
             keyboard = help_pannel_page1(_)
             try:
                 return await message.reply_photo(
-                    photo=config.START_IMG_URL,
+                    photo=await get_start_image(config.START_IMG_URL),
                     caption=_["help_1"].format(config.SUPPORT_GROUP),
                     reply_markup=keyboard,
                     message_effect_id=5159385139981059251,
