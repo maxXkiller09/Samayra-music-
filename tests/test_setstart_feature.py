@@ -103,6 +103,13 @@ class SetStartFeatureRegressionTests(unittest.TestCase):
         self.assertIn("_reply_welcome_photo(", self.start)
         self.assertIn("welcome_photo, welcome_caption", self.start)
 
+    def test_help_deep_link_uses_saved_welcome_image(self):
+        start_pm = source_function(self.start, "start_pm")
+        help_branch = start_pm.split('if name[0:4] == "help":', 1)[1].split('if name[0:3] == "sud":', 1)[0]
+        self.assertIn("_welcome_payload(message, help_caption)", help_branch)
+        self.assertIn("_reply_welcome_photo(", help_branch)
+        self.assertNotIn("photo=config.START_IMG_URL", help_branch)
+
     def test_caption_length_uses_telegram_utf16_units(self):
         node = next(
             node for node in self.tree.body
