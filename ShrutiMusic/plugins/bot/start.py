@@ -24,6 +24,26 @@ from config import BANNED_USERS
 from strings import get_string
 
 
+async def _welcome_payload(message, default_caption):
+    """Resolve custom global welcome settings, falling back to the existing caption."""
+    import html
+    from ShrutiMusic.utils.startsettings import get_start_settings
+    try:
+        settings = await get_start_settings()
+    except Exception:
+        settings = {"caption": None, "photo": None}
+    photo = settings.get("photo") or config.START_IMG_URL
+    caption = settings.get("caption")
+    if caption:
+        first_name = message.from_user.first_name if message.from_user else "there"
+        caption = (caption.replace("{first_name}", html.escape(first_name or "there"))
+                   .replace("{bot_name}", html.escape("Yuvika Music"))
+                   .replace("{username}", html.escape("Yuvikamusic_bot")))
+    else:
+        caption = default_caption
+    return photo, caption
+
+
 @app.on_message(filters.command(["start"]) & filters.private & ~BANNED_USERS)
 @LanguageStart
 async def start_pm(client, message: Message, _):
@@ -102,17 +122,19 @@ async def start_pm(client, message: Message, _):
         if name == "start":
             out = private_panel(_)
             UP, CPU, RAM, DISK = await bot_sys_stats()
+            default_caption = _["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM)
+            welcome_photo, welcome_caption = await _welcome_payload(message, default_caption)
             try:
                 await message.reply_photo(
-                    photo=config.START_IMG_URL,
-                    caption=_["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM),
+                    photo=welcome_photo,
+                    caption=welcome_caption,
                     reply_markup=InlineKeyboardMarkup(out),
                     message_effect_id=5159385139981059251,
                 )
             except:
                 await message.reply_photo(
-                    photo=config.START_IMG_URL,
-                    caption=_["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM),
+                    photo=welcome_photo,
+                    caption=welcome_caption,
                     reply_markup=InlineKeyboardMarkup(out),
                 )
             if await is_on_off(2):
@@ -123,17 +145,19 @@ async def start_pm(client, message: Message, _):
     else:
         out = private_panel(_)
         UP, CPU, RAM, DISK = await bot_sys_stats()
+        default_caption = _["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM)
+        welcome_photo, welcome_caption = await _welcome_payload(message, default_caption)
         try:
             await message.reply_photo(
-                photo=config.START_IMG_URL,
-                caption=_["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM),
+                photo=welcome_photo,
+                caption=welcome_caption,
                 reply_markup=InlineKeyboardMarkup(out),
                 message_effect_id=5159385139981059251,
             )
         except:
             await message.reply_photo(
-                photo=config.START_IMG_URL,
-                caption=_["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM),
+                photo=welcome_photo,
+                caption=welcome_caption,
                 reply_markup=InlineKeyboardMarkup(out),
             )
         if await is_on_off(2):
@@ -148,17 +172,19 @@ async def start_pm(client, message: Message, _):
 async def start_gp(client, message: Message, _):
     out = start_panel(_)
     uptime = int(time.time() - _boot_)
+    default_caption = _["start_1"].format(app.mention, get_readable_time(uptime))
+    welcome_photo, welcome_caption = await _welcome_payload(message, default_caption)
     try:
         await message.reply_photo(
-            photo=config.START_IMG_URL,
-            caption=_["start_1"].format(app.mention, get_readable_time(uptime)),
+            photo=welcome_photo,
+            caption=welcome_caption,
             reply_markup=InlineKeyboardMarkup(out),
             message_effect_id=5159385139981059251,
         )
     except:
         await message.reply_photo(
-            photo=config.START_IMG_URL,
-            caption=_["start_1"].format(app.mention, get_readable_time(uptime)),
+            photo=welcome_photo,
+            caption=welcome_caption,
             reply_markup=InlineKeyboardMarkup(out),
         )
     return await add_served_chat(message.chat.id)
@@ -191,27 +217,21 @@ async def welcome(client, message: Message):
                     return await app.leave_chat(message.chat.id)
 
                 out = start_panel(_)
+                default_caption = _["start_3"].format(
+                    message.from_user.first_name, app.mention, message.chat.title, app.mention
+                )
+                welcome_photo, welcome_caption = await _welcome_payload(message, default_caption)
                 try:
                     await message.reply_photo(
-                        photo=config.START_IMG_URL,
-                        caption=_["start_3"].format(
-                            message.from_user.first_name,
-                            app.mention,
-                            message.chat.title,
-                            app.mention,
-                        ),
+                        photo=welcome_photo,
+                        caption=welcome_caption,
                         reply_markup=InlineKeyboardMarkup(out),
                         message_effect_id=5159385139981059251,
                     )
                 except:
                     await message.reply_photo(
-                        photo=config.START_IMG_URL,
-                        caption=_["start_3"].format(
-                            message.from_user.first_name,
-                            app.mention,
-                            message.chat.title,
-                            app.mention,
-                        ),
+                        photo=welcome_photo,
+                        caption=welcome_caption,
                         reply_markup=InlineKeyboardMarkup(out),
                     )
                 await add_served_chat(message.chat.id)
