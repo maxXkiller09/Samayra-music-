@@ -2,6 +2,7 @@ from pyrogram import Client
 import config
 
 from ..logging import LOGGER
+from ..utils.session_validation import duplicate_session_slots
 
 assistants = []
 assistantids = []
@@ -45,6 +46,24 @@ class Userbot(Client):
         )
 
     async def start(self):
+        session_values = [
+            ("STRING_SESSION", config.STRING1),
+            ("STRING_SESSION2", config.STRING2),
+            ("STRING_SESSION3", config.STRING3),
+            ("STRING_SESSION4", config.STRING4),
+            ("STRING_SESSION5", config.STRING5),
+        ]
+        duplicates = duplicate_session_slots(session_values)
+        if duplicates:
+            slots = ", ".join(f"{first} and {second}" for first, second in duplicates)
+            message = (
+                "Duplicate assistant session string configured in "
+                f"{slots}. Use a distinct session string for each assistant slot; "
+                "session values are intentionally omitted from logs."
+            )
+            LOGGER(__name__).error(message)
+            raise RuntimeError(message)
+
         LOGGER(__name__).info(f"Starting Assistants...")
 
         if config.STRING1:
