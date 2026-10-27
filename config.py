@@ -68,7 +68,7 @@ STRING5 = os.getenv("STRING_SESSION5", None)
 
 AUTO_LEAVING_ASSISTANT = _env_bool("AUTO_LEAVING_ASSISTANT", False)
 
-START_IMG_URL = os.getenv("START_IMG_URL", "https://files.catbox.moe/7q8bfg.jpg")
+START_IMG_URL = os.getenv("START_IMG_URL", "https://kommodo.ai/i/Nl2hou1EQHSSrJ4NL2Po")
 PING_IMG_URL = "https://files.catbox.moe/eehxb4.jpg"
 PLAYLIST_IMG_URL = "https://files.catbox.moe/eehxb4.jpg"
 STATS_IMG_URL = "https://files.catbox.moe/eehxb4.jpg"
