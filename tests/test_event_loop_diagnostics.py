@@ -23,7 +23,10 @@ class EventLoopDiagnosticsTests(unittest.IsolatedAsyncioTestCase):
         try:
             await asyncio.sleep(0.01)
             time.sleep(0.08)
-            await asyncio.sleep(0)
+            for _ in range(10):
+                await asyncio.sleep(0)
+                if self.module.get_event_loop_lag_ms() > 10.0:
+                    break
             self.assertGreater(self.module.get_event_loop_lag_ms(), 10.0)
         finally:
             await self.module.stop_event_loop_monitor()
