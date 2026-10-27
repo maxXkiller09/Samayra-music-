@@ -6,7 +6,14 @@ from ShrutiMusic import app
 from ShrutiMusic.misc import SUDOERS
 import asyncio
 
-from ShrutiMusic.utils.autoplay import AUTOPLAY, autoplay_label, load_autoplay, set_autoplay
+from ShrutiMusic.utils.autoplay import (
+    AUTOPLAY,
+    autoplay_label,
+    load_autoplay,
+    schedule_autoplay_fill,
+    set_autoplay,
+)
+from ShrutiMusic.utils.autoplay_commands import parse_autoplay_action
 
 
 try:
@@ -59,12 +66,43 @@ async def autoplay_callback(_, query):
 async def autoplay_command(_, message):
     if not message.from_user or not await _can_toggle(message.chat.id, message.from_user.id):
         return await message.reply_text("❌ Ye command sirf group admins ke liye hai.")
-    if len(message.command) > 1 and message.command[1].lower() in ("on", "off"):
-        value = message.command[1].lower() == "on"
-        await set_autoplay(message.chat.id, value)
+    chat_id = message.chat.id
+    action = parse_autoplay_action(message.command[1:])
+    if action == "invalid":
+        return await message.reply_text(
+            "Use: /autoplay on, /autoplay off, /autoplay status, or /autoplay next."
+        )
+
+    if action == "status":
+        value = bool(AUTOPLAY.get(chat_id, False))
+        return await message.reply_text(
+            "🔁 Autoplay <b>ON</b> ✅" if value else "🔁 Autoplay <b>OFF</b>."
+        )
+
+    if action == "next":
+        if not AUTOPLAY.get(chat_id, False):
+            return await message.reply_text("Autoplay OFF hai. Pehle /autoplay on karo.")
+        from ShrutiMusic.misc import db
+
+        queue = db.get(chat_id) or []
+        if not queue:
+            return await message.reply_text("Pehle /play se ek track start karo.")
+        if len(queue) > 1:
+            return await message.reply_text(
+                "Queue mein next track pehle se hai; autoplay usse replace nahi karega."
+            )
+        task = schedule_autoplay_fill(chat_id, queue[0])
+        if task is None:
+            return await message.reply_text("Similar track search abhi start nahi ho saki.")
+        return await message.reply_text(
+            "🔎 Similar-vibe track background mein search ho raha hai. Milne par queue mein add hoga."
+        )
+
+    if action in ("on", "off"):
+        value = action == "on"
     else:
-        value = not AUTOPLAY.get(message.chat.id, False)
-        await set_autoplay(message.chat.id, value)
+        value = not AUTOPLAY.get(chat_id, False)
+    await set_autoplay(chat_id, value)
     await message.reply_text(
         "🔁 Autoplay <b>ON</b> ✅\nQueue khatam hone par milta-julta gaana apne aap bajega."
         if value
