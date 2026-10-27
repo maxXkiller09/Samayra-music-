@@ -33,6 +33,11 @@ def _new_token():
     return uuid.uuid4().hex[:10]
 
 
+def _caption_length(text):
+    # Telegram entity offsets/limits use UTF-16 code units, including emoji.
+    return len(text.encode("utf-16-le")) // 2
+
+
 def _rotate(draft):
     draft["token"] = _new_token()
 
@@ -169,10 +174,10 @@ async def _load_draft():
 
 @app.on_message(filters.command("setstart"))
 async def setstart_command(_, message: Message):
+    if not isinstance(OWNER_ID, int) or OWNER_ID <= 0:
+        return await message.reply_text("⚠️ Configure a valid positive OWNER_ID in Render environment variables, then restart the service.")
     if not message.from_user or not _is_owner(message.from_user.id):
         return await message.reply_text("⛔ This command is available to the configured bot owner only.")
-    if OWNER_ID <= 0:
-        return await message.reply_text("⚠️ Set a valid positive OWNER_ID in Render environment variables first.")
     try:
         draft = _drafts.get(OWNER_ID)
         if draft is None:
@@ -219,7 +224,7 @@ async def setstart_callback(_, query):
         if action == "save":
             try:
                 caption = draft.get("caption")
-                if caption and len(caption) > MAX_CAPTION:
+                if caption and _caption_length(caption) > MAX_CAPTION:
                     raise ValueError("Welcome caption exceeds Telegram's 1024-character photo caption limit.")
                 if caption:
                     await app.parser.parse(caption, enums.ParseMode.HTML)
@@ -264,7 +269,7 @@ async def setstart_collect_input(_, message: Message):
         if draft["mode"] == "text":
             if not message.text or message.text.startswith("/"):
                 return await message.reply_text("Send the welcome caption as text/HTML, not as a command.")
-            if len(message.text) > MAX_CAPTION:
+            if _caption_length(message.text) > MAX_CAPTION:
                 return await message.reply_text("❌ Caption too long. Telegram photo captions allow up to 1024 characters.")
             try:
                 await app.parser.parse(message.text, enums.ParseMode.HTML)
