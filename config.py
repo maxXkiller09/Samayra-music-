@@ -66,6 +66,29 @@ STRING3 = os.getenv("STRING_SESSION3", None)
 STRING4 = os.getenv("STRING_SESSION4", None)
 STRING5 = os.getenv("STRING_SESSION5", None)
 
+# The same Pyrogram session must never be assigned to multiple assistant slots.
+# Keep the error diagnostic safe: session strings are credentials and must not
+# appear in logs or exceptions.
+_session_slots = {
+    "STRING_SESSION": STRING1,
+    "STRING_SESSION2": STRING2,
+    "STRING_SESSION3": STRING3,
+    "STRING_SESSION4": STRING4,
+    "STRING_SESSION5": STRING5,
+}
+_seen_sessions = {}
+for _slot_name, _session_value in _session_slots.items():
+    if not _session_value:
+        continue
+    _normalized_session = _session_value.strip()
+    if _normalized_session in _seen_sessions:
+        raise RuntimeError(
+            "Duplicate assistant session configured in "
+            f"{_seen_sessions[_normalized_session]} and {_slot_name}. "
+            "Each configured assistant slot must use a unique Telegram session."
+        )
+    _seen_sessions[_normalized_session] = _slot_name
+
 AUTO_LEAVING_ASSISTANT = _env_bool("AUTO_LEAVING_ASSISTANT", False)
 
 START_IMG_URL = os.getenv("START_IMG_URL", "https://files.catbox.moe/7q8bfg.jpg")

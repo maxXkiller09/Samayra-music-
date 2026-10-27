@@ -17,6 +17,23 @@ REQUIRED_VALUES = {
 
 
 class RequiredStartupConfigTests(unittest.TestCase):
+    def test_duplicate_assistant_sessions_fail_without_echoing_secrets(self):
+        env = os.environ.copy()
+        env.update(REQUIRED_VALUES)
+        env["STRING_SESSION"] = "private-session-test-value"
+        env["STRING_SESSION2"] = "private-session-test-value"
+        result = subprocess.run(
+            [sys.executable, "-c", "import config"],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Duplicate assistant session configured", result.stderr)
+        self.assertNotIn("private-session-test-value", result.stderr)
+
     def test_each_required_setting_fails_fast_when_missing(self):
         for missing in REQUIRED_VALUES:
             with self.subTest(missing=missing):
