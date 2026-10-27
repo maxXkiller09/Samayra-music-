@@ -24,6 +24,41 @@ from config import BANNED_USERS
 from strings import get_string
 
 
+async def _reply_welcome_photo(message, photo, caption, reply_markup):
+    """Send the selected welcome image, falling back safely if a stored file_id expires."""
+    kwargs = {"caption": caption, "reply_markup": reply_markup}
+    try:
+        return await message.reply_photo(
+            photo=photo, message_effect_id=5159385139981059251, **kwargs
+        )
+    except Exception:
+        try:
+            return await message.reply_photo(photo=photo, **kwargs)
+        except Exception:
+            if not photo or photo == config.START_IMG_URL:
+                raise
+            try:
+                result = await message.reply_photo(
+                    photo=config.START_IMG_URL,
+                    message_effect_id=5159385139981059251,
+                    **kwargs,
+                )
+            except Exception:
+                result = await message.reply_photo(photo=config.START_IMG_URL, **kwargs)
+            owner_id = getattr(config, "OWNER_ID", 0)
+            if isinstance(owner_id, int) and owner_id > 0:
+                try:
+                    await app.send_message(
+                        owner_id,
+                        "⚠️ The saved Yuvika Music welcome image could not be sent. "
+                        "Use /setstart → Set Welcome Image, upload a replacement, "
+                        "then Preview and Save Changes.",
+                    )
+                except Exception:
+                    pass
+            return result
+
+
 async def _welcome_payload(message, default_caption):
     """Resolve custom global welcome settings, falling back to the existing caption."""
     import html
@@ -124,19 +159,9 @@ async def start_pm(client, message: Message, _):
             UP, CPU, RAM, DISK = await bot_sys_stats()
             default_caption = _["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM)
             welcome_photo, welcome_caption = await _welcome_payload(message, default_caption)
-            try:
-                await message.reply_photo(
-                    photo=welcome_photo,
-                    caption=welcome_caption,
-                    reply_markup=InlineKeyboardMarkup(out),
-                    message_effect_id=5159385139981059251,
-                )
-            except:
-                await message.reply_photo(
-                    photo=welcome_photo,
-                    caption=welcome_caption,
-                    reply_markup=InlineKeyboardMarkup(out),
-                )
+            await _reply_welcome_photo(
+                message, welcome_photo, welcome_caption, InlineKeyboardMarkup(out)
+            )
             if await is_on_off(2):
                 return await app.send_message(
                     chat_id=config.LOG_GROUP_ID,
@@ -147,19 +172,9 @@ async def start_pm(client, message: Message, _):
         UP, CPU, RAM, DISK = await bot_sys_stats()
         default_caption = _["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM)
         welcome_photo, welcome_caption = await _welcome_payload(message, default_caption)
-        try:
-            await message.reply_photo(
-                photo=welcome_photo,
-                caption=welcome_caption,
-                reply_markup=InlineKeyboardMarkup(out),
-                message_effect_id=5159385139981059251,
-            )
-        except:
-            await message.reply_photo(
-                photo=welcome_photo,
-                caption=welcome_caption,
-                reply_markup=InlineKeyboardMarkup(out),
-            )
+        await _reply_welcome_photo(
+            message, welcome_photo, welcome_caption, InlineKeyboardMarkup(out)
+        )
         if await is_on_off(2):
             return await app.send_message(
                 chat_id=config.LOG_GROUP_ID,
@@ -221,19 +236,9 @@ async def welcome(client, message: Message):
                     message.from_user.first_name, app.mention, message.chat.title, app.mention
                 )
                 welcome_photo, welcome_caption = await _welcome_payload(message, default_caption)
-                try:
-                    await message.reply_photo(
-                        photo=welcome_photo,
-                        caption=welcome_caption,
-                        reply_markup=InlineKeyboardMarkup(out),
-                        message_effect_id=5159385139981059251,
-                    )
-                except:
-                    await message.reply_photo(
-                        photo=welcome_photo,
-                        caption=welcome_caption,
-                        reply_markup=InlineKeyboardMarkup(out),
-                    )
+                await _reply_welcome_photo(
+                    message, welcome_photo, welcome_caption, InlineKeyboardMarkup(out)
+                )
                 await add_served_chat(message.chat.id)
                 await message.stop_propagation()
         except Exception as ex:
