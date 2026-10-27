@@ -115,6 +115,7 @@ __HELP__ = """
 **Autoplay:**
 
 • Gaane ke message me **AUTOPLAY** button dabao, ya `/autoplay on` / `/autoplay off` likho.
+• `/autoplay status` current setting dikhata hai; `/autoplay next` ek similar track background me queue karne ki koshish karta hai.
 • ON hone par queue khatam hote hi milta-julta gaana apne aap bajta rehta hai.
 • Sirf group admins badal sakte hain.
 """
