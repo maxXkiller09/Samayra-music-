@@ -38,6 +38,60 @@ class AutoplayMatchingTests(unittest.TestCase):
         query = self.module._search_query("Arijit Singh - Tum Hi Ho")
         self.assertEqual(query, "songs like Arijit Singh - Tum Hi Ho similar vibe")
 
+    def test_search_queries_use_multiple_discovery_strategies(self):
+        queries = self.module._search_queries("Arijit Singh - Romantic Hindi Song")
+        self.assertGreaterEqual(len(queries), 2)
+        self.assertTrue(any("romantic" in query.lower() for query in queries))
+        self.assertTrue(any("artists similar to" in query.lower() for query in queries))
+
+    def test_canonical_identity_ignores_upload_labels_and_punctuation(self):
+        current = "Arijit Singh - Tum Hi Ho"
+        alternate_upload = "Tum Hi Ho (Official Video) - Arijit Singh"
+        self.assertEqual(
+            self.module._canonical_identity(current, self.module._artist_hint(current)),
+            self.module._canonical_identity(alternate_upload, self.module._artist_hint(alternate_upload)),
+        )
+
+    def test_alternate_versions_are_rejected(self):
+        for title in (
+            "Tum Hi Ho Remix",
+            "Tum Hi Ho (Slowed + Reverb)",
+            "Tum Hi Ho Sped Up",
+            "Tum Hi Ho Live",
+        ):
+            self.assertTrue(self.module._is_alternate_version(title), title)
+
+    def test_duplicate_filter_rejects_current_track_and_versions(self):
+        current = "Arijit Singh - Tum Hi Ho"
+        self.assertTrue(
+            self.module._candidate_is_duplicate(
+                current,
+                {"title": "Tum Hi Ho (Official Audio) - Arijit Singh"},
+                set(),
+                set(),
+            )
+        )
+        self.assertTrue(
+            self.module._candidate_is_duplicate(
+                current, {"title": "Tum Hi Ho Remix"}, set(), set()
+            )
+        )
+
+    def test_duplicate_filter_respects_queue_and_recent_history(self):
+        current = "Arijit Singh - Tum Hi Ho"
+        queued = self.module._canonical_identity("Kesariya - Arijit Singh")
+        recent = self.module._canonical_identity("Channa Mereya - Arijit Singh")
+        self.assertTrue(
+            self.module._candidate_is_duplicate(
+                current, {"title": "Kesariya - Arijit Singh"}, {queued}, set()
+            )
+        )
+        self.assertTrue(
+            self.module._candidate_is_duplicate(
+                current, {"title": "Channa Mereya - Arijit Singh"}, set(), {recent}
+            )
+        )
+
     def test_mood_and_artist_match_ranks_above_unrelated_track(self):
         current = "Arijit Singh - Sad Heartbreak Song"
         similar = {

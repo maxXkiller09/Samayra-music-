@@ -5,7 +5,8 @@ from ShrutiMusic.core.mongo import mongodb
 
 autoplay_db = mongodb.autoplay
 AUTOPLAY = {}  # chat_id -> bool (button ke liye sync cache)
-_recent = {}  # chat_id -> pichle vidid (repeat se bachne ke liye)
+_recent = {}  # chat_id -> recently seen source IDs
+_recent_identity = {}  # chat_id -> bounded canonical identities
 _loaded = False
 _fill_tasks = {}  # chat_id -> active recommendation search task
 
@@ -80,6 +81,115 @@ def _artist_hint(title):
     return parts[0].strip() if len(parts) == 2 and parts[0].strip() else ""
 
 
+_VERSION_RE = re.compile(
+    r"(?i)\b(remix|slowed|sped[ -]?up|speed[ -]?up|reverb|nightcore|8d|"
+    r"extended mix|radio edit|club mix|lofi version)\b"
+)
+_UPLOAD_NOISE_RE = re.compile(
+    r"(?i)\b(official|video|audio|lyrics?|lyrical|full|hd|4k|mp3|"
+    r"visuali[sz]er|topic|uploaded)\b"
+)
+_ALT_SUFFIX_RE = re.compile(
+    r"(?i)(?:^|[\s\-–—])(live|acoustic|instrumental|karaoke|cover)(?:\s+version)?$"
+)
+
+
+def _is_alternate_version(title):
+    """Reject explicit alternate versions without stripping meaningful title words."""
+    raw = title or ""
+    if _VERSION_RE.search(raw):
+        return True
+    for bracketed in re.findall(r"[\(\[\{]([^\)\]\}]*)[\)\]\}]", raw):
+        if _VERSION_RE.search(bracketed) or re.search(
+            r"(?i)\b(live|acoustic|instrumental|karaoke|cover)\b", bracketed
+        ):
+            return True
+    return bool(_ALT_SUFFIX_RE.search(raw.strip()))
+
+
+def _canonical_identity(title, artist=None):
+    """Build a lightweight identity robust to upload labels and title formatting."""
+    raw = title or ""
+
+    def _clean_bracket(match):
+        contents = match.group(1)
+        if _VERSION_RE.search(contents) or _UPLOAD_NOISE_RE.search(contents) or re.search(
+            r"(?i)\b(live|acoustic|instrumental|karaoke|cover)\b", contents
+        ):
+            return " "
+        return contents
+
+    raw = re.sub(r"[\(\[\{]([^\)\]\}]*)[\)\]\}]", _clean_bracket, raw)
+    raw = _VERSION_RE.sub(" ", raw)
+    raw = _UPLOAD_NOISE_RE.sub(" ", raw)
+    raw = re.sub(r"[\[\]{}()]", " ", raw)
+    raw = re.sub(r"[^a-zA-Z0-9\u0900-\u097F]+", " ", raw).lower()
+    title_tokens = set(re.findall(r"[a-z0-9\u0900-\u097f]+", raw))
+    if artist:
+        artist_raw = _UPLOAD_NOISE_RE.sub(" ", artist or "")
+        artist_tokens = set(re.findall(r"[a-z0-9\u0900-\u097f]+", artist_raw.lower()))
+        if artist_tokens:
+            title_tokens |= artist_tokens
+    return " ".join(sorted(title_tokens))
+
+
+def _candidate_artist(candidate):
+    channel = candidate.get("channel")
+    if isinstance(channel, dict):
+        return channel.get("name") or ""
+    return str(channel or candidate.get("artist") or "")
+
+
+def _language_hint(title):
+    words = _tokens(title)
+    if words & {"punjabi", "bhangra", "gurbani", "sidhu", "diljit", "shubh"}:
+        return "Punjabi"
+    if words & {"hindi", "bollywood", "arijit", "shreya", "kishore", "lata"}:
+        return "Hindi"
+    return ""
+
+
+def _search_queries(current_title):
+    """Use a few bounded, distinct searches rather than one title-only query."""
+    moods = _moods(current_title)
+    language = _language_hint(current_title)
+    mood_phrases = {
+        "sad": "sad heartbreak emotional songs",
+        "romantic": "romantic love songs",
+        "party": "energetic party dance songs",
+        "devotional": "devotional bhajan songs",
+        "lofi": "chill lofi mellow songs",
+        "rap": "rap hip hop songs",
+    }
+    mood_phrase = next((mood_phrases[m] for m in ("romantic", "party", "sad", "devotional", "lofi", "rap") if m in moods), "")
+    base = f"songs like {_clean_title(current_title)} similar vibe"
+    if mood_phrase:
+        base = f"{base} {mood_phrase}"
+    queries = [base]
+    if mood_phrase:
+        queries.append(" ".join(part for part in (mood_phrase, language, "songs similar vibe") if part))
+    artist = _artist_hint(current_title)
+    if artist:
+        queries.append(" ".join(part for part in ("songs by artists similar to", artist, language, mood_phrase) if part))
+    else:
+        queries.append(" ".join(part for part in ("different songs with a similar vibe", language, mood_phrase) if part))
+    # Stable de-duplication and hard cap keep external load predictable.
+    return list(dict.fromkeys(q.strip() for q in queries if q.strip()))[:3]
+
+
+def _candidate_is_duplicate(current_title, candidate, queued_identities, recent_identities):
+    title = candidate.get("title") or ""
+    if not title or _is_alternate_version(title):
+        return True
+    identity = _canonical_identity(title, _artist_hint(title))
+    current_identity = _canonical_identity(current_title, _artist_hint(current_title))
+    if identity and identity == current_identity:
+        return True
+    if identity and (identity in queued_identities or identity in recent_identities):
+        return True
+    return False
+
+
 def _search_query(current_title):
     """Add a small mood hint when the current title clearly signals a vibe."""
     mood_terms = {
@@ -97,26 +207,29 @@ def _search_query(current_title):
 
 
 def _score_candidate(current_title, candidate):
-    """Rank results by mood/artist/word overlap and penalize near-duplicates."""
+    """Rank different tracks by vibe cues; never reward same-artist repetition."""
     title = candidate.get("title") or ""
-    current = _clean_title(current_title).lower()
-    candidate_clean = _clean_title(title).lower()
-    if not candidate_clean or candidate_clean == current:
+    current_identity = _canonical_identity(current_title, _artist_hint(current_title))
+    candidate_identity = _canonical_identity(title, _artist_hint(title))
+    if not candidate_identity or candidate_identity == current_identity or _is_alternate_version(title):
         return -100
 
-    current_words = _tokens(current)
-    candidate_words = _tokens(candidate_clean)
+    current_words = _tokens(_clean_title(current_title))
+    candidate_words = _tokens(_clean_title(title))
     shared = current_words & candidate_words
-    # Generic words are weak evidence; mood and artist hints matter more.
     generic = {"the", "and", "song", "songs", "official", "video", "audio", "lyrics"}
-    score = min(len(shared - generic), 4)
+    score = min(len(shared - generic), 2)
     current_moods = _moods(current_title)
     candidate_moods = _moods(title)
     if current_moods and candidate_moods:
         score += 5 if current_moods & candidate_moods else -3
+    language = _language_hint(current_title)
+    if language and language.lower() in title.lower():
+        score += 2
     artist = _artist_hint(current_title)
-    if artist and artist.lower() in title.lower():
-        score += 3
+    candidate_artist = _artist_hint(title)
+    if artist and candidate_artist and artist.casefold() == candidate_artist.casefold():
+        score -= 2
     duration = str(candidate.get("duration") or "")
     if not duration or len(duration.split(":")) != 2:
         score -= 8
@@ -156,21 +269,49 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
             return False
 
         seen = _recent.setdefault(chat_id, [])
+        recent_identities = _recent_identity.setdefault(chat_id, [])
         if popped.get("vidid"):
             seen.append(popped["vidid"])
-        del seen[:-20]
-
         current_title = _clean_title(popped.get("title"))
+        current_identity = _canonical_identity(current_title, _artist_hint(current_title))
+        if current_identity:
+            recent_identities.append(current_identity)
+        del seen[:-30]
+        del recent_identities[:-30]
+
         if not current_title:
             return False
-        # One focused query keeps end-of-track lookup lightweight. Rank the
-        # returned pool locally instead of choosing an arbitrary first result.
-        query = _search_query(current_title)
-        # Never let a slow search hold the voice chat at the end of the queue.
-        # If YouTube search stalls, autoplay safely gives up and playback can end.
-        results = (
-            await asyncio.wait_for(VideosSearch(query, limit=15).next(), timeout=12)
-        ).get("result", [])
+
+        # Exclude anything already queued, including same-song uploads with a
+        # different YouTube ID. Manual requests remain untouched; this applies
+        # only to autoplay recommendations.
+        current_queue = db.get(chat_id) or []
+        queued_ids = {str(item.get("vidid")) for item in current_queue if item.get("vidid")}
+        queued_identities = {
+            _canonical_identity(item.get("title", ""), _artist_hint(item.get("title", "")))
+            for item in current_queue
+            if item.get("title")
+        }
+        queries = _search_queries(current_title)
+
+        async def _fetch(query):
+            try:
+                response = await asyncio.wait_for(VideosSearch(query, limit=10).next(), timeout=9)
+                return response.get("result", [])
+            except Exception as exc:
+                print(f"[autoplay] search failed: {type(exc).__name__}")
+                return []
+
+        # Three bounded strategies run concurrently; no AI/API/model is needed.
+        batches = await asyncio.gather(*(_fetch(query) for query in queries))
+        results = []
+        ids = set()
+        for batch in batches:
+            for item in batch:
+                vidid = str(item.get("id") or "")
+                if vidid and vidid not in ids:
+                    ids.add(vidid)
+                    results.append(item)
         # If the current song ended while search was running, allow the result
         # only while the voice chat is still active and no manual track replaced it.
         current_queue = db.get(chat_id) or []
@@ -191,8 +332,12 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
         pool = [
             item for item in results
             if item.get("id")
-            and item.get("id") not in seen
+            and str(item.get("id")) not in seen
+            and str(item.get("id")) not in queued_ids
             and _is_short(item.get("duration"))
+            and not _candidate_is_duplicate(
+                current_title, item, queued_identities, set(recent_identities)
+            )
         ]
         if not pool:
             return False
