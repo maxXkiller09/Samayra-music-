@@ -87,19 +87,12 @@ async def start_pm(client, message: Message, _):
         name = message.text.split(None, 1)[1]
         if name[0:4] == "help":
             keyboard = help_pannel_page1(_)
-            try:
-                return await message.reply_photo(
-                    photo=config.START_IMG_URL,
-                    caption=_["help_1"].format(config.SUPPORT_GROUP),
-                    reply_markup=keyboard,
-                    message_effect_id=5159385139981059251,
-                )
-            except:
-                return await message.reply_photo(
-                    photo=config.START_IMG_URL,
-                    caption=_["help_1"].format(config.SUPPORT_GROUP),
-                    reply_markup=keyboard,
-                )
+            help_caption = _["help_1"].format(config.SUPPORT_GROUP)
+            # Keep the custom owner-selected image on /start help deep links too.
+            welcome_photo, _ = await _welcome_payload(message, help_caption)
+            return await _reply_welcome_photo(
+                message, welcome_photo, help_caption, keyboard
+            )
         if name[0:3] == "sud":
             await sudoers_list(client=client, message=message, _=_)
             if await is_on_off(2):

@@ -29,6 +29,21 @@ class AutoplayMatchingTests(unittest.TestCase):
             "Arijit Singh - Tum Hi Ho",
         )
 
+    def test_alternate_versions_share_the_same_canonical_song(self):
+        canonical = self.module._canonical_song_title
+        self.assertEqual(
+            canonical("Arijit Singh - Tum Hi Ho"),
+            canonical("Different Singer - Tum Hi Ho (Acoustic Cover)"),
+        )
+        self.assertEqual(
+            canonical("Tum Hi Ho"),
+            canonical("Tum Hi Ho - Slowed and Reverb"),
+        )
+        self.assertEqual(
+            canonical("Tum Hi Ho"),
+            canonical("Tum Hi Ho Sped Up Remix"),
+        )
+
     def test_search_query_adds_mood_hint_when_detectable(self):
         query = self.module._search_query("Arijit Singh - Sad Heartbreak Song")
         self.assertIn("similar vibe", query)

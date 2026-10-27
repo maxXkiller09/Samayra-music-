@@ -5,7 +5,8 @@ from ShrutiMusic.core.mongo import mongodb
 
 autoplay_db = mongodb.autoplay
 AUTOPLAY = {}  # chat_id -> bool (button ke liye sync cache)
-_recent = {}  # chat_id -> pichle vidid (repeat se bachne ke liye)
+_recent = {}  # chat_id -> recently played/queued video IDs
+_recent_titles = {}  # chat_id -> canonical song titles to reject alternate versions
 _loaded = False
 _fill_tasks = {}  # chat_id -> active recommendation search task
 
@@ -67,6 +68,24 @@ def _clean_title(title):
 
 def _tokens(text):
     return set(re.findall(r"[a-z0-9]+", (text or "").lower()))
+
+
+def _canonical_song_title(title):
+    """Normalize a track to its core title, ignoring common alternate versions."""
+    text = _clean_title(title).lower()
+    # Strip version labels and any trailing upload descriptor before splitting artist/title.
+    text = re.sub(
+        r"\s*[-–—]?\s*\b(?:slowed(?:\s+and)?\s+reverb|sped\s*up|nightcore|remix|"
+        r"remastered|acoustic(?:\s+version)?|cover(?:\s+by)?|live(?:\s+version)?|"
+        r"karaoke|instrumental|lo[ -]?fi|8d|edit|unplugged|version|full\s+version)\b.*$",
+        " ",
+        text,
+    )
+    parts = re.split(r"\s[-–—]\s", text, maxsplit=1)
+    if len(parts) == 2:
+        text = parts[1]
+    text = re.sub(r"\b(?:official|audio|video|lyrics?|visualizer|hd|4k)\b", " ", text)
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
 
 
 def _moods(text):
@@ -163,6 +182,11 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
         current_title = _clean_title(popped.get("title"))
         if not current_title:
             return False
+        current_key = _canonical_song_title(current_title)
+        seen_titles = _recent_titles.setdefault(chat_id, [])
+        if current_key:
+            seen_titles.append(current_key)
+        del seen_titles[:-20]
         # One focused query keeps end-of-track lookup lightweight. Rank the
         # returned pool locally instead of choosing an arbitrary first result.
         query = _search_query(current_title)
@@ -192,6 +216,8 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
             item for item in results
             if item.get("id")
             and item.get("id") not in seen
+            and _canonical_song_title(item.get("title")) not in seen_titles
+            and _canonical_song_title(item.get("title"))
             and _is_short(item.get("duration"))
         ]
         if not pool:
@@ -211,6 +237,10 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
         duration = pick["duration"]
         seen.append(vidid)
         del seen[:-20]
+        picked_key = _canonical_song_title(title)
+        if picked_key:
+            seen_titles.append(picked_key)
+            del seen_titles[:-20]
         if chat_id not in db:
             db[chat_id] = []
         await put_queue(
