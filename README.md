@@ -29,7 +29,7 @@ Important configuration:
 - `OWNER_ID`: numeric Telegram user ID of the bot owner
 - `MONGO_DB_URI`: MongoDB connection string
 - `LOG_GROUP_ID`: numeric Telegram log group ID
-- `STRING_SESSION` and any additional `STRING_SESSION2`–`STRING_SESSION5` values used by your chosen assistant setup
+- `STRING_SESSION` and any additional `STRING_SESSION2`–`STRING_SESSION5` values used by your chosen assistant setup. Each configured slot must use a distinct session string; do not reuse the same string across slots or run the same assistant session on multiple live services at once. Startup now rejects exact duplicate strings without printing their values.
 - `BASE_API_URL` and `VIDEO_DOWNLOADER_TOKEN`: only if the related download integration is configured
 - `SHRUTI_API_KEY`: only if the related API integration is used
 
