@@ -5,7 +5,7 @@ import sys
 import time
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,8 +28,14 @@ class AutoplayMatchingTests(unittest.TestCase):
         module = self.module
         module._search_cache.clear()
         module._search_cache["old"] = (time.monotonic() - 1, [{"id": "x", "title": "x", "duration": "3:00"}])
-        with patch.object(module, "_fetch_search_results", return_value=None):
-            # Expired cache entry is discarded before a fresh search is attempted.
+        with patch.object(
+            module,
+            "_fetch_search_results",
+            new=AsyncMock(return_value=[{"id": "fresh", "title": "fresh", "duration": "3:00"}]),
+        ):
+            # Expired cache entries are discarded and a fresh lookup is used.
+            result = asyncio.run(module._search_results("old"))
+            self.assertEqual(result[0]["id"], "fresh")
             self.assertNotIn("old", module._search_cache)
         module._search_cache.clear()
         module._SEARCH_CACHE_MAX = 2
