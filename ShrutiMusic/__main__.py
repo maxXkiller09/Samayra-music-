@@ -30,6 +30,10 @@ from ShrutiMusic.core.call import Nand
 from ShrutiMusic.misc import sudo
 from ShrutiMusic.plugins import ALL_MODULES
 from ShrutiMusic.utils.database import get_banned_users, get_gbanned
+from ShrutiMusic.utils.stream.diagnostics import (
+    start_event_loop_monitor,
+    stop_event_loop_monitor,
+)
 from config import BANNED_USERS
 
 COMMANDS = [
@@ -115,7 +119,9 @@ async def init():
         "Yuvika Music started successfully."
     )
 
+    start_event_loop_monitor()
     await idle()
+    await stop_event_loop_monitor()
 
     await app.stop()
     await userbot.stop()
