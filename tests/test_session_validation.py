@@ -1,6 +1,6 @@
 import unittest
 
-from ShrutiMusic.utils.session_validation import duplicate_session_slots
+from session_validation import duplicate_session_slots
 
 
 class DuplicateAssistantSessionTests(unittest.TestCase):
