@@ -2,7 +2,7 @@ from pyrogram import Client
 import config
 
 from ..logging import LOGGER
-from ..utils.session_validation import duplicate_session_slots
+from session_validation import duplicate_session_slots
 
 assistants = []
 assistantids = []
