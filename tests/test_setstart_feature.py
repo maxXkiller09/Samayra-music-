@@ -100,7 +100,8 @@ class SetStartFeatureRegressionTests(unittest.TestCase):
     def test_start_handlers_read_saved_welcome_settings(self):
         self.assertIn("get_start_settings", self.start)
         self.assertIn("_welcome_payload(message, default_caption)", self.start)
-        self.assertIn("_reply_welcome_photo(message, welcome_photo", self.start)
+        self.assertIn("_reply_welcome_photo(", self.start)
+        self.assertIn("welcome_photo, welcome_caption", self.start)
 
     def test_caption_length_uses_telegram_utf16_units(self):
         node = next(
