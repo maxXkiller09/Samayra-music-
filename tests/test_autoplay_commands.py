@@ -1,6 +1,18 @@
+import importlib.util
+from pathlib import Path
 import unittest
 
-from ShrutiMusic.utils.autoplay_commands import parse_autoplay_action
+
+MODULE_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "ShrutiMusic"
+    / "utils"
+    / "autoplay_commands.py"
+)
+SPEC = importlib.util.spec_from_file_location("autoplay_commands_under_test", MODULE_PATH)
+MODULE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(MODULE)
+parse_autoplay_action = MODULE.parse_autoplay_action
 
 
 class AutoplayCommandParsingTests(unittest.TestCase):
