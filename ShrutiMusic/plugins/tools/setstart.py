@@ -160,9 +160,18 @@ async def _preview(draft):
     photo = draft.get("photo") or config.START_IMG_URL
     caption = _render_caption(draft.get("caption"))
     if not caption:
-        caption = "🎶 <b>Yuvika Music</b>\n\nThis is the default welcome preview."
-    await app.send_photo(OWNER_ID, photo=photo, caption=caption, parse_mode=enums.ParseMode.HTML)
+        try:
+            from ShrutiMusic.utils import bot_sys_stats
+            from ShrutiMusic.utils.database import get_lang
+            from strings import get_string
 
+            owner = await app.get_users(OWNER_ID)
+            up, cpu, ram, disk = await bot_sys_stats()
+            strings = get_string(await get_lang(OWNER_ID))
+            caption = strings["start_2"].format(owner.mention, app.mention, up, disk, cpu, ram)
+        except Exception:
+            caption = "🎶 <b>Yuvika Music</b>\\n\\nThis is the default welcome preview."
+    await app.send_photo(OWNER_ID, photo=photo, caption=caption, parse_mode=enums.ParseMode.HTML)
 
 async def _load_draft():
     active = await get_start_settings()
