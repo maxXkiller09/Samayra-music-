@@ -14,6 +14,7 @@ async def _monitor_loop(interval=1.0, report_interval=60.0):
     expected = loop.time() + interval
     next_report = loop.time() + report_interval
     max_lag_ms = 0.0
+    last_warning = 0.0
 
     while True:
         await asyncio.sleep(max(0.0, expected - loop.time()))
@@ -21,8 +22,9 @@ async def _monitor_loop(interval=1.0, report_interval=60.0):
         _last_lag_ms = max(0.0, (now - expected) * 1000.0)
         max_lag_ms = max(max_lag_ms, _last_lag_ms)
 
-        if _last_lag_ms >= 250.0:
+        if _last_lag_ms >= 250.0 and now - last_warning >= 30.0:
             _LOGGER.warning("event_loop_lag_ms=%.1f", _last_lag_ms)
+            last_warning = now
 
         if now >= next_report:
             _LOGGER.info(
