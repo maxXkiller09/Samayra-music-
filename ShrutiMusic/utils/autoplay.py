@@ -82,24 +82,44 @@ def _artist_hint(title):
 
 
 _VERSION_RE = re.compile(
-    r"(?i)\b(remix|slowed|sped[ -]?up|speed[ -]?up|reverb|live|acoustic|"
-    r"instrumental|karaoke|cover|nightcore|8d|visuali[sz]er|extended mix|"
-    r"radio edit|club mix|lofi version)\b"
+    r"(?i)\b(remix|slowed|sped[ -]?up|speed[ -]?up|reverb|nightcore|8d|"
+    r"extended mix|radio edit|club mix|lofi version)\b"
 )
 _UPLOAD_NOISE_RE = re.compile(
     r"(?i)\b(official|video|audio|lyrics?|lyrical|full|hd|4k|mp3|"
     r"visuali[sz]er|topic|uploaded)\b"
 )
+_ALT_SUFFIX_RE = re.compile(
+    r"(?i)(?:^|[\s\-–—])(live|acoustic|instrumental|karaoke|cover)(?:\s+version)?$"
+)
+
 
 def _is_alternate_version(title):
-    """Reject uploads explicitly labelled as a remix/alternate recording."""
-    return bool(_VERSION_RE.search(title or ""))
+    """Reject explicit alternate versions without stripping meaningful title words."""
+    raw = title or ""
+    if _VERSION_RE.search(raw):
+        return True
+    for bracketed in re.findall(r"[\(\[\{]([^\)\]\}]*)[\)\]\}]", raw):
+        if _VERSION_RE.search(bracketed) or re.search(
+            r"(?i)\b(live|acoustic|instrumental|karaoke|cover)\b", bracketed
+        ):
+            return True
+    return bool(_ALT_SUFFIX_RE.search(raw.strip()))
 
 
 def _canonical_identity(title, artist=None):
     """Build a lightweight identity robust to upload labels and title formatting."""
     raw = title or ""
-    # Remove only known version/upload labels; preserve meaningful title words.
+
+    def _clean_bracket(match):
+        contents = match.group(1)
+        if _VERSION_RE.search(contents) or _UPLOAD_NOISE_RE.search(contents) or re.search(
+            r"(?i)\b(live|acoustic|instrumental|karaoke|cover)\b", contents
+        ):
+            return " "
+        return contents
+
+    raw = re.sub(r"[\(\[\{]([^\)\]\}]*)[\)\]\}]", _clean_bracket, raw)
     raw = _VERSION_RE.sub(" ", raw)
     raw = _UPLOAD_NOISE_RE.sub(" ", raw)
     raw = re.sub(r"[\[\]{}()]", " ", raw)
@@ -108,7 +128,6 @@ def _canonical_identity(title, artist=None):
     if artist:
         artist_raw = _UPLOAD_NOISE_RE.sub(" ", artist or "")
         artist_tokens = set(re.findall(r"[a-z0-9\u0900-\u097f]+", artist_raw.lower()))
-        # Include an artist signal only when known, but allow artist/title ordering differences.
         if artist_tokens:
             title_tokens |= artist_tokens
     return " ".join(sorted(title_tokens))
@@ -191,7 +210,7 @@ def _score_candidate(current_title, candidate):
     """Rank different tracks by vibe cues; never reward same-artist repetition."""
     title = candidate.get("title") or ""
     current_identity = _canonical_identity(current_title, _artist_hint(current_title))
-    candidate_identity = _canonical_identity(title, _candidate_artist(candidate))
+    candidate_identity = _canonical_identity(title, _artist_hint(title))
     if not candidate_identity or candidate_identity == current_identity or _is_alternate_version(title):
         return -100
 
