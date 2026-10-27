@@ -49,6 +49,28 @@ class AutoplayMatchingTests(unittest.TestCase):
             module._SEARCH_CACHE_MAX = 64
             module._search_cache.clear()
 
+    def test_identical_searches_share_one_inflight_request(self):
+        module = self.module
+        module._search_cache.clear()
+        module._search_tasks.clear()
+
+        async def fake_fetch(_query):
+            await asyncio.sleep(0.01)
+            return [{"id": "same", "title": "Same track", "duration": "3:00"}]
+
+        async def run():
+            with patch.object(module, "_fetch_search_results", new=AsyncMock(side_effect=fake_fetch)) as fetch:
+                first, second = await asyncio.gather(
+                    module._search_results("Same Query"),
+                    module._search_results(" same   query "),
+                )
+                fetch.assert_awaited_once()
+                self.assertEqual(first, second)
+
+        asyncio.run(run())
+        module._search_tasks.clear()
+        module._search_cache.clear()
+
     def test_recent_history_is_bounded_by_chat_count(self):
         module = self.module
         module._recent.clear()
