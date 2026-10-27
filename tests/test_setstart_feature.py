@@ -84,6 +84,7 @@ class SetStartFeatureRegressionTests(unittest.TestCase):
         self.assertIn("photo=photo", preview)
         self.assertIn('save_start_settings(caption, draft.get("photo"))', callback)
         self.assertIn("Save failed. Previous settings remain active.", callback)
+        self.assertIn("await save_start_settings(caption, draft.get(\"photo\"))", callback)
 
     def test_start_falls_back_when_saved_photo_id_is_unusable(self):
         helper = source_function(self.start, "_reply_welcome_photo")
@@ -99,7 +100,7 @@ class SetStartFeatureRegressionTests(unittest.TestCase):
     def test_start_handlers_read_saved_welcome_settings(self):
         self.assertIn("get_start_settings", self.start)
         self.assertIn("_welcome_payload(message, default_caption)", self.start)
-        self.assertIn("photo=welcome_photo", self.start)
+        self.assertIn("_reply_welcome_photo(message, welcome_photo", self.start)
 
     def test_caption_length_uses_telegram_utf16_units(self):
         node = next(
