@@ -149,9 +149,10 @@ async def greet_group(_, member: ChatMemberUpdated):
         return
 
     user = member.new_chat_member.user if member.new_chat_member else member.from_user
+    os.makedirs("downloads", exist_ok=True)
     try:
         pic = await app.download_media(
-            user.photo.big_file_id, file_name=f"pp{user.id}.png"
+            user.photo.big_file_id, file_name=f"downloads/pp{user.id}.png"
         )
     except AttributeError:
         pic = "ShrutiMusic/assets/upic.png"
