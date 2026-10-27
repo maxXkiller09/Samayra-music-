@@ -7,7 +7,6 @@ from py_yt import VideosSearch
 import config
 from ShrutiMusic import app
 from ShrutiMusic.misc import _boot_
-from ShrutiMusic.utils.welcome_settings import get_start_image
 from ShrutiMusic.plugins.sudo.sudoers import sudoers_list
 from ShrutiMusic.utils.database import (
     add_served_chat,
@@ -35,14 +34,14 @@ async def start_pm(client, message: Message, _):
             keyboard = help_pannel_page1(_)
             try:
                 return await message.reply_photo(
-                    photo=await get_start_image(config.START_IMG_URL),
+                    photo=config.START_IMG_URL,
                     caption=_["help_1"].format(config.SUPPORT_GROUP),
                     reply_markup=keyboard,
                     message_effect_id=5159385139981059251,
                 )
             except:
                 return await message.reply_photo(
-                    photo=await get_start_image(config.START_IMG_URL),
+                    photo=config.START_IMG_URL,
                     caption=_["help_1"].format(config.SUPPORT_GROUP),
                     reply_markup=keyboard,
                 )
@@ -105,14 +104,14 @@ async def start_pm(client, message: Message, _):
             UP, CPU, RAM, DISK = await bot_sys_stats()
             try:
                 await message.reply_photo(
-                    photo=await get_start_image(config.START_IMG_URL),
+                    photo=config.START_IMG_URL,
                     caption=_["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM),
                     reply_markup=InlineKeyboardMarkup(out),
                     message_effect_id=5159385139981059251,
                 )
             except:
                 await message.reply_photo(
-                    photo=await get_start_image(config.START_IMG_URL),
+                    photo=config.START_IMG_URL,
                     caption=_["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM),
                     reply_markup=InlineKeyboardMarkup(out),
                 )
@@ -126,14 +125,14 @@ async def start_pm(client, message: Message, _):
         UP, CPU, RAM, DISK = await bot_sys_stats()
         try:
             await message.reply_photo(
-                photo=await get_start_image(config.START_IMG_URL),
+                photo=config.START_IMG_URL,
                 caption=_["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM),
                 reply_markup=InlineKeyboardMarkup(out),
                 message_effect_id=5159385139981059251,
             )
         except:
             await message.reply_photo(
-                photo=await get_start_image(config.START_IMG_URL),
+                photo=config.START_IMG_URL,
                 caption=_["start_2"].format(message.from_user.mention, app.mention, UP, DISK, CPU, RAM),
                 reply_markup=InlineKeyboardMarkup(out),
             )
@@ -151,14 +150,14 @@ async def start_gp(client, message: Message, _):
     uptime = int(time.time() - _boot_)
     try:
         await message.reply_photo(
-            photo=await get_start_image(config.START_IMG_URL),
+            photo=config.START_IMG_URL,
             caption=_["start_1"].format(app.mention, get_readable_time(uptime)),
             reply_markup=InlineKeyboardMarkup(out),
             message_effect_id=5159385139981059251,
         )
     except:
         await message.reply_photo(
-            photo=await get_start_image(config.START_IMG_URL),
+            photo=config.START_IMG_URL,
             caption=_["start_1"].format(app.mention, get_readable_time(uptime)),
             reply_markup=InlineKeyboardMarkup(out),
         )
@@ -194,7 +193,7 @@ async def welcome(client, message: Message):
                 out = start_panel(_)
                 try:
                     await message.reply_photo(
-                        photo=await get_start_image(config.START_IMG_URL),
+                        photo=config.START_IMG_URL,
                         caption=_["start_3"].format(
                             message.from_user.first_name,
                             app.mention,
@@ -206,7 +205,7 @@ async def welcome(client, message: Message):
                     )
                 except:
                     await message.reply_photo(
-                        photo=await get_start_image(config.START_IMG_URL),
+                        photo=config.START_IMG_URL,
                         caption=_["start_3"].format(
                             message.from_user.first_name,
                             app.mention,
