@@ -1,4 +1,6 @@
 import os
+from urllib.parse import urlparse
+import config
 from unidecode import unidecode
 from PIL import ImageDraw, Image, ImageFont, ImageChops
 from pyrogram import *
@@ -50,8 +52,56 @@ def welcomepic(pic, user, chat, id, uname):
     draw.text((65, 430), f"USERNAME : {uname}", fill="white", font=font)
     pfp_position = (767, 133)  
     background.paste(pfp, pfp_position, pfp)  
+    os.makedirs("downloads", exist_ok=True)
     background.save(f"downloads/welcome#{id}.png")
     return f"downloads/welcome#{id}.png"
+
+
+def _is_owner(message):
+    return bool(message.from_user and message.from_user.id == config.OWNER_ID)
+
+
+@app.on_message(filters.command(["setstartimage"]) & filters.private)
+async def set_start_image(_, message: Message):
+    """Owner-only persistent /start image: reply to a photo or pass a direct HTTPS URL."""
+    if not _is_owner(message):
+        return await message.reply_text("⛔ This command is owner-only.")
+    photo = None
+    if message.reply_to_message and message.reply_to_message.photo:
+        photo = message.reply_to_message.photo[-1].file_id
+    elif len(message.command) > 1:
+        url = message.text.split(None, 1)[1].strip()
+        parsed = urlparse(url)
+        if parsed.scheme == "https" and parsed.netloc and not parsed.username and not parsed.password:
+            photo = url
+        else:
+            return await message.reply_text("Send a direct HTTPS image URL, or reply to a photo with /setstartimage.")
+    else:
+        return await message.reply_text("Reply to a photo with /setstartimage, or send /setstartimage https://...")
+
+    try:
+        await wlcm.update_one(
+            {"_id": "start_image"},
+            {"$set": {"photo": photo}},
+            upsert=True,
+        )
+        await message.reply_text("✅ Start welcome image saved. It will persist across restarts.")
+    except Exception:
+        LOGGER.exception("Failed to save start welcome image")
+        await message.reply_text("❌ Couldn't save the image setting. Check the database connection and try again.")
+
+
+@app.on_message(filters.command(["resetstartimage"]) & filters.private)
+async def reset_start_image(_, message: Message):
+    """Restore the default START_IMG_URL."""
+    if not _is_owner(message):
+        return await message.reply_text("⛔ This command is owner-only.")
+    try:
+        await wlcm.delete_one({"_id": "start_image"})
+        await message.reply_text("✅ Default start welcome image restored.")
+    except Exception:
+        LOGGER.exception("Failed to reset start welcome image")
+        await message.reply_text("❌ Couldn't reset the image setting. Check the database connection and try again.")
 
 @app.on_message(filters.command("welcome") & ~filters.private)
 async def auto_state(_, message):
