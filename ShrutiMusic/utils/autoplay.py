@@ -73,16 +73,17 @@ def _tokens(text):
 def _canonical_song_title(title):
     """Normalize a track to its core title, ignoring common alternate versions."""
     text = _clean_title(title).lower()
-    parts = re.split(r"\s[-–—]\s", text, maxsplit=1)
-    if len(parts) == 2:
-        text = parts[1]
+    # Strip version labels and any trailing upload descriptor before splitting artist/title.
     text = re.sub(
-        r"\b(?:slowed(?:\s+and)?\s+reverb|sped\s*up|nightcore|remix|"
+        r"\s*[-–—]?\s*\b(?:slowed(?:\s+and)?\s+reverb|sped\s*up|nightcore|remix|"
         r"remastered|acoustic(?:\s+version)?|cover(?:\s+by)?|live(?:\s+version)?|"
-        r"karaoke|instrumental|lo[ -]?fi|8d|edit|unplugged|version|full\s+version)\b",
+        r"karaoke|instrumental|lo[ -]?fi|8d|edit|unplugged|version|full\s+version)\b.*$",
         " ",
         text,
     )
+    parts = re.split(r"\s[-–—]\s", text, maxsplit=1)
+    if len(parts) == 2:
+        text = parts[1]
     text = re.sub(r"\b(?:official|audio|video|lyrics?|visualizer|hd|4k)\b", " ", text)
     return re.sub(r"[^a-z0-9]+", " ", text).strip()
 
