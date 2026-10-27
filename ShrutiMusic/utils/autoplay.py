@@ -82,15 +82,14 @@ def _artist_hint(title):
 
 
 _VERSION_RE = re.compile(
-    r"(?i)\\b(remix|slowed|sped[ -]?up|speed[ -]?up|reverb|live|acoustic|"
+    r"(?i)\b(remix|slowed|sped[ -]?up|speed[ -]?up|reverb|live|acoustic|"
     r"instrumental|karaoke|cover|nightcore|8d|visuali[sz]er|extended mix|"
-    r"radio edit|club mix|lofi version)\\b"
+    r"radio edit|club mix|lofi version)\b"
 )
 _UPLOAD_NOISE_RE = re.compile(
-    r"(?i)\\b(official|video|audio|lyrics?|lyrical|full|hd|4k|mp3|"
-    r"visuali[sz]er|topic|uploaded)\\b"
+    r"(?i)\b(official|video|audio|lyrics?|lyrical|full|hd|4k|mp3|"
+    r"visuali[sz]er|topic|uploaded)\b"
 )
-
 
 def _is_alternate_version(title):
     """Reject uploads explicitly labelled as a remix/alternate recording."""
@@ -103,12 +102,12 @@ def _canonical_identity(title, artist=None):
     # Remove only known version/upload labels; preserve meaningful title words.
     raw = _VERSION_RE.sub(" ", raw)
     raw = _UPLOAD_NOISE_RE.sub(" ", raw)
-    raw = re.sub(r"[\\[\\]{}()]", " ", raw)
-    raw = re.sub(r"[^a-zA-Z0-9\\u0900-\\u097F]+", " ", raw).lower()
-    title_tokens = set(re.findall(r"[a-z0-9\\u0900-\\u097f]+", raw))
+    raw = re.sub(r"[\[\]{}()]", " ", raw)
+    raw = re.sub(r"[^a-zA-Z0-9\u0900-\u097F]+", " ", raw).lower()
+    title_tokens = set(re.findall(r"[a-z0-9\u0900-\u097f]+", raw))
     if artist:
         artist_raw = _UPLOAD_NOISE_RE.sub(" ", artist or "")
-        artist_tokens = set(re.findall(r"[a-z0-9\\u0900-\\u097f]+", artist_raw.lower()))
+        artist_tokens = set(re.findall(r"[a-z0-9\u0900-\u097f]+", artist_raw.lower()))
         # Include an artist signal only when known, but allow artist/title ordering differences.
         if artist_tokens:
             title_tokens |= artist_tokens
