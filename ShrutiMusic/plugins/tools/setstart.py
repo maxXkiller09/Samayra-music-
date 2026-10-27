@@ -112,8 +112,8 @@ async def _show_menu(chat_id, draft, note=None, message=None):
         try:
             await message.edit_text(text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
             return
-        except Exception:
-            pass
+        except Exception as exc:
+            LOGGER.warning("setstart menu edit failed; stage=edit_menu exception_type=%s", type(exc).__name__)
     await app.send_message(chat_id, text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
 
 
@@ -177,9 +177,22 @@ async def _download_image(url):
 
 async def _photo_file_id_from_bytes(data, image_format):
     _validate_image_bytes(data)
-    suffix = {"JPEG": ".jpg", "PNG": ".png", "GIF": ".gif", "WEBP": ".webp"}[image_format]
-    stream = io.BytesIO(data)
-    stream.name = "welcome-image" + suffix
+    # Telegram's photo endpoint is most reliable with a named JPEG upload.
+    # Convert supported source formats (including transparent PNG/WebP) safely.
+    with Image.open(io.BytesIO(data)) as image:
+        if image_format == "GIF":
+            image.seek(0)
+        if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+            rgba = image.convert("RGBA")
+            background = Image.new("RGB", rgba.size, "white")
+            background.paste(rgba, mask=rgba.getchannel("A"))
+            image_to_send = background
+        else:
+            image_to_send = image.convert("RGB")
+        stream = io.BytesIO()
+        image_to_send.save(stream, format="JPEG", quality=90, optimize=True)
+    stream.seek(0)
+    stream.name = "welcome-image.jpg"
     uploaded = await app.send_photo(OWNER_ID, photo=stream)
     try:
         if not uploaded.photo:
