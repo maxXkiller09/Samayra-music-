@@ -76,8 +76,8 @@ class SetStartImageValidationTests(unittest.TestCase):
         self.assertIn("filters.photo | filters.document", self.source)
         self.assertIn("await app.download_media(message, in_memory=True)", self.source)
         self.assertIn("media = message.photo[-1]", self.source)
-        self.assertIn("stage=\"download_telegram_photo\"", self.source)
-        self.assertIn("stage=\"download_telegram_document\"", self.source)
+        self.assertIn('stage = "download_telegram_photo"', self.source)
+        self.assertIn('stage = "download_telegram_document"', self.source)
 
     def test_invalid_image_does_not_update_draft_before_validation(self):
         handler = ast.get_source_segment(
