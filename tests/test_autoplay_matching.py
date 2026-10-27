@@ -2,9 +2,10 @@ import asyncio
 import importlib.util
 from pathlib import Path
 import sys
+import time
 import types
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +23,66 @@ class AutoplayMatchingTests(unittest.TestCase):
             )
             cls.module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(cls.module)
+
+    def test_search_cache_is_bounded_and_expires(self):
+        module = self.module
+        module._search_cache.clear()
+        module._search_cache["old"] = (time.monotonic() - 1, [{"id": "x", "title": "x", "duration": "3:00"}])
+        with patch.object(
+            module,
+            "_fetch_search_results",
+            new=AsyncMock(return_value=[{"id": "fresh", "title": "fresh", "duration": "3:00"}]),
+        ):
+            # Expired cache entries are discarded and a fresh lookup is used.
+            result = asyncio.run(module._search_results("old"))
+            self.assertEqual(result[0]["id"], "fresh")
+            self.assertNotIn("old", module._search_cache)
+        module._search_cache.clear()
+        module._SEARCH_CACHE_MAX = 2
+        try:
+            for key in ("a", "b", "c"):
+                module._search_cache[key] = (time.monotonic() + 30, [])
+                while len(module._search_cache) > module._SEARCH_CACHE_MAX:
+                    module._search_cache.popitem(last=False)
+            self.assertEqual(list(module._search_cache), ["b", "c"])
+        finally:
+            module._SEARCH_CACHE_MAX = 64
+            module._search_cache.clear()
+
+    def test_identical_searches_share_one_inflight_request(self):
+        module = self.module
+        module._search_cache.clear()
+        module._search_tasks.clear()
+
+        async def fake_fetch(_query):
+            await asyncio.sleep(0.01)
+            return [{"id": "same", "title": "Same track", "duration": "3:00"}]
+
+        async def run():
+            with patch.object(module, "_fetch_search_results", new=AsyncMock(side_effect=fake_fetch)) as fetch:
+                first, second = await asyncio.gather(
+                    module._search_results("Same Query"),
+                    module._search_results(" same   query "),
+                )
+                fetch.assert_awaited_once()
+                self.assertEqual(first, second)
+
+        asyncio.run(run())
+        module._search_tasks.clear()
+        module._search_cache.clear()
+
+    def test_recent_history_is_bounded_by_chat_count(self):
+        module = self.module
+        module._recent.clear()
+        module._RECENT_CHAT_MAX = 2
+        try:
+            module._recent_for(1)
+            module._recent_for(2)
+            module._recent_for(3)
+            self.assertEqual(list(module._recent), [2, 3])
+        finally:
+            module._RECENT_CHAT_MAX = 256
+            module._recent.clear()
 
     def test_title_cleanup_removes_upload_noise(self):
         self.assertEqual(

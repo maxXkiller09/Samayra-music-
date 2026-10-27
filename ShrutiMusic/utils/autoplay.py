@@ -1,13 +1,82 @@
 import asyncio
 import re
+import time
+from collections import OrderedDict
 
 from ShrutiMusic.core.mongo import mongodb
 
 autoplay_db = mongodb.autoplay
 AUTOPLAY = {}  # chat_id -> bool (button ke liye sync cache)
-_recent = {}  # chat_id -> pichle vidid (repeat se bachne ke liye)
+_recent = OrderedDict()  # chat_id -> bounded recently played IDs
 _loaded = False
 _fill_tasks = {}  # chat_id -> active recommendation search task
+
+# Cache only stable search metadata, never expiring stream URLs. All structures
+# are bounded so a busy group bot stays predictable on Render Free.
+_SEARCH_CACHE_TTL = 90
+_SEARCH_CACHE_MAX = 64
+_SEARCH_INFLIGHT_MAX = 16
+_RECENT_CHAT_MAX = 256
+_search_cache = OrderedDict()  # normalized query -> (expiry monotonic time, results)
+_search_tasks = {}  # normalized query -> shared in-flight search task
+_search_semaphore = asyncio.Semaphore(2)
+
+
+def _recent_for(chat_id):
+    history = _recent.get(chat_id)
+    if history is None:
+        history = []
+        _recent[chat_id] = history
+    _recent.move_to_end(chat_id) if isinstance(_recent, OrderedDict) else None
+    while len(_recent) > _RECENT_CHAT_MAX:
+        _recent.pop(next(iter(_recent)))
+    return history
+
+
+async def _fetch_search_results(query):
+    from py_yt import VideosSearch
+
+    async with _search_semaphore:
+        response = await asyncio.wait_for(
+            VideosSearch(query, limit=15).next(), timeout=12
+        )
+    # Keep only stable, small metadata fields. Never cache stream URLs.
+    results = [
+        {"id": item.get("id"), "title": item.get("title"), "duration": item.get("duration")}
+        for item in (response.get("result", []) or [])
+        if isinstance(item, dict) and item.get("id") and item.get("title")
+    ]
+    _search_cache[query] = (time.monotonic() + _SEARCH_CACHE_TTL, results)
+    _search_cache.move_to_end(query)
+    while len(_search_cache) > _SEARCH_CACHE_MAX:
+        _search_cache.popitem(last=False)
+    return [dict(item) for item in results]
+
+
+def _clear_search_task(query, task):
+    if _search_tasks.get(query) is task:
+        _search_tasks.pop(query, None)
+
+
+async def _search_results(query):
+    key = " ".join((query or "").lower().split())
+    cached = _search_cache.get(key)
+    if cached:
+        expires, results = cached
+        if expires > time.monotonic():
+            _search_cache.move_to_end(key)
+            return [dict(item) for item in results]
+        _search_cache.pop(key, None)
+
+    task = _search_tasks.get(key)
+    if task is None:
+        # Bound queued/in-flight unique queries as well as active network work.
+        if len(_search_tasks) >= _SEARCH_INFLIGHT_MAX:
+            return []
+        task = asyncio.create_task(_fetch_search_results(key))
+        _search_tasks[key] = task
+        task.add_done_callback(lambda done: _clear_search_task(key, done))
+    return [dict(item) for item in await asyncio.shield(task)]
 
 # Lightweight mood hints from titles; no extra API or model call required.
 _MOOD_WORDS = {
@@ -142,8 +211,6 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
     try:
         if not popped or not AUTOPLAY.get(chat_id):
             return False
-        from py_yt import VideosSearch
-
         from ShrutiMusic import app
         from ShrutiMusic.misc import db
         from ShrutiMusic.utils.stream.queue import put_queue
@@ -155,7 +222,7 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
         elif current_queue:
             return False
 
-        seen = _recent.setdefault(chat_id, [])
+        seen = _recent_for(chat_id)
         if popped.get("vidid"):
             seen.append(popped["vidid"])
         del seen[:-20]
@@ -168,9 +235,7 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
         query = _search_query(current_title)
         # Never let a slow search hold the voice chat at the end of the queue.
         # If YouTube search stalls, autoplay safely gives up and playback can end.
-        results = (
-            await asyncio.wait_for(VideosSearch(query, limit=15).next(), timeout=12)
-        ).get("result", [])
+        results = await _search_results(query)
         # If the current song ended while search was running, allow the result
         # only while the voice chat is still active and no manual track replaced it.
         current_queue = db.get(chat_id) or []
@@ -226,7 +291,7 @@ async def _autoplay_fill_impl(chat_id, popped, proactive=False):
         )
         return True
     except Exception as e:
-        print(f"[autoplay] fill error: {type(e).__name__}: {e}")
+        print(f"[autoplay] fill error: {type(e).__name__}")
         return False
 
 
@@ -246,7 +311,7 @@ def _reschedule_if_track_changed(chat_id, attempted_track, _task):
         if len(queue) == 1 and queue[0] is not attempted_track:
             schedule_autoplay_fill(chat_id, queue[0])
     except Exception as exc:
-        print(f"[autoplay] reschedule error: {type(exc).__name__}: {exc}")
+        print(f"[autoplay] reschedule error: {type(exc).__name__}")
 
 
 def schedule_autoplay_fill(chat_id, current_track):
