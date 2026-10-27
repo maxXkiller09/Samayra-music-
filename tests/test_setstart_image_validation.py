@@ -3,11 +3,9 @@ import ast
 import asyncio
 import io
 import unittest
-from types import SimpleNamespace
-from urllib.parse import urljoin
-from unittest.mock import AsyncMock
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import urljoin
 from unittest.mock import AsyncMock
 
 from PIL import Image, UnidentifiedImageError
