@@ -1,7 +1,11 @@
 """Regression tests for /setstart welcome-image validation and Telegram media handling."""
 import ast
+import asyncio
 import io
 import unittest
+from types import SimpleNamespace
+from urllib.parse import urljoin
+from unittest.mock import AsyncMock
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -41,6 +45,65 @@ def _image_bytes(fmt="JPEG", size=(32, 24)):
     output = io.BytesIO()
     Image.new("RGB", size, "navy").save(output, format=fmt)
     return output.getvalue()
+
+
+class _FakeContent:
+    def __init__(self, data):
+        self.data = data
+
+    async def iter_chunked(self, chunk_size):
+        for offset in range(0, len(self.data), chunk_size):
+            yield self.data[offset:offset + chunk_size]
+
+
+class _FakeResponse:
+    def __init__(self, data, content_type="application/octet-stream", status=200, timeout=False):
+        self.data = data
+        self.status = status
+        self.headers = {"Content-Type": content_type, "Content-Length": str(len(data))}
+        self.content = _FakeContent(data)
+        self.timeout = timeout
+
+    async def __aenter__(self):
+        if self.timeout:
+            raise asyncio.TimeoutError()
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+
+class _FakeSession:
+    def __init__(self, response):
+        self.response = response
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    def get(self, url, allow_redirects=False):
+        return self.response
+
+
+def _image_downloader(response, validate):
+    source = PLUGIN_PATH.read_text(encoding="utf-8")
+    node = _function_node(source, "_download_image")
+    namespace = {
+        "aiohttp": SimpleNamespace(
+            ClientTimeout=lambda **kwargs: None,
+            ClientSession=lambda **kwargs: _FakeSession(response),
+        ),
+        "asyncio": asyncio,
+        "urljoin": urljoin,
+        "_safe_public_https": AsyncMock(),
+        "_validate_image_bytes": validate,
+        "MAX_REDIRECTS": 3,
+        "MAX_IMAGE_BYTES": 5 * 1024 * 1024,
+    }
+    exec(compile(ast.Module(body=[node], type_ignores=[]), str(PLUGIN_PATH), "exec"), namespace)
+    return namespace["_download_image"]
 
 
 class SetStartImageValidationTests(unittest.TestCase):
@@ -106,6 +169,23 @@ class SetStartImageValidationTests(unittest.TestCase):
         self.assertIn("_is_owner(query.from_user.id)", callback)
         self.assertIn('if action == "save":', callback)
         self.assertIn("await save_start_settings(caption, draft.get(\"photo\"))", callback)
+
+    def test_https_url_download_accepts_image_even_with_mismatched_content_type(self):
+        response = _FakeResponse(_image_bytes("JPEG"), content_type="application/octet-stream")
+        downloader = _image_downloader(response, self.validate)
+        self.assertEqual(asyncio.run(downloader("https://images.example/welcome")), _image_bytes("JPEG"))
+
+    def test_https_url_download_rejects_html_body(self):
+        response = _FakeResponse(b"<html>not an image</html>", content_type="image/jpeg")
+        downloader = _image_downloader(response, self.validate)
+        with self.assertRaises(ValueError):
+            asyncio.run(downloader("https://images.example/not-an-image"))
+
+    def test_https_url_timeout_is_not_silently_swallowed(self):
+        response = _FakeResponse(b"", timeout=True)
+        downloader = _image_downloader(response, self.validate)
+        with self.assertRaises(asyncio.TimeoutError):
+            asyncio.run(downloader("https://images.example/slow"))
 
 
 if __name__ == "__main__":
