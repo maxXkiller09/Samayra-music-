@@ -3,8 +3,11 @@ import asyncio
 import html
 import ipaddress
 import io
+import logging
 import socket
 import uuid
+
+from PIL import Image, UnidentifiedImageError
 from urllib.parse import urljoin, urlparse
 
 import aiohttp
@@ -19,10 +22,50 @@ from ShrutiMusic.utils.startsettings import get_start_settings, reset_start_sett
 OWNER_ID = getattr(config, "OWNER_ID", 0)
 MAX_CAPTION = 1024
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_DIMENSION = 10_000
+MAX_IMAGE_PIXELS = 40_000_000
 MAX_REDIRECTS = 3
+LOGGER = logging.getLogger(__name__)
 _drafts = {}
 _locks = {}
-_IMAGE_MAGIC = (b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n", b"GIF87a", b"GIF89a")
+_IMAGE_FORMATS = {"JPEG", "PNG", "GIF", "WEBP"}
+
+
+def _validate_image_bytes(data):
+    """Validate downloaded bytes using Pillow, not filenames or HTTP headers."""
+    if not isinstance(data, (bytes, bytearray)) or not data:
+        raise ValueError("The image download was empty.")
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError("Image is too large (maximum 5 MB).")
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            image_format = (image.format or "").upper()
+            width, height = image.size
+            if image_format not in _IMAGE_FORMATS:
+                raise ValueError("Supported formats are JPEG, PNG, GIF and WebP.")
+            if width < 1 or height < 1 or width > MAX_IMAGE_DIMENSION or height > MAX_IMAGE_DIMENSION:
+                raise ValueError("Image dimensions are invalid or too large.")
+            if width * height > MAX_IMAGE_PIXELS:
+                raise ValueError("Image resolution is too large.")
+            image.verify()
+        return image_format
+    except ValueError:
+        raise
+    except (UnidentifiedImageError, OSError, SyntaxError) as exc:
+        raise ValueError("The file is not a valid, complete image.") from exc
+
+
+def _downloaded_bytes(downloaded):
+    if downloaded is None:
+        raise RuntimeError("Telegram returned no downloaded file.")
+    if isinstance(downloaded, (bytes, bytearray)):
+        return bytes(downloaded)
+    if hasattr(downloaded, "getvalue"):
+        return downloaded.getvalue()
+    if hasattr(downloaded, "read"):
+        downloaded.seek(0)
+        return downloaded.read(MAX_IMAGE_BYTES + 1)
+    raise RuntimeError("Telegram returned an unsupported download object.")
 
 
 def _is_owner(user_id):
@@ -69,8 +112,8 @@ async def _show_menu(chat_id, draft, note=None, message=None):
         try:
             await message.edit_text(text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
             return
-        except Exception:
-            pass
+        except Exception as exc:
+            LOGGER.warning("setstart menu edit failed; stage=edit_menu exception_type=%s", type(exc).__name__)
     await app.send_message(chat_id, text, reply_markup=markup, parse_mode=enums.ParseMode.HTML)
 
 
@@ -110,8 +153,8 @@ async def _download_image(url):
                     continue
                 if response.status != 200:
                     raise ValueError(f"Image server returned HTTP {response.status}.")
-                if not response.headers.get("Content-Type", "").lower().startswith("image/"):
-                    raise ValueError("That URL is not serving an image.")
+                # Content-Type is advisory: validate the bytes below so valid images
+                # served as application/octet-stream work, while HTML is still rejected.
                 length = response.headers.get("Content-Length")
                 if length:
                     try:
@@ -127,25 +170,45 @@ async def _download_image(url):
                     if len(data) > MAX_IMAGE_BYTES:
                         raise ValueError("Image is too large (maximum 5 MB).")
                 image = bytes(data)
-                webp = len(image) >= 12 and image[:4] == b"RIFF" and image[8:12] == b"WEBP"
-                if not image or not (any(image.startswith(m) for m in _IMAGE_MAGIC) or webp):
-                    raise ValueError("URL did not return a supported JPEG, PNG, GIF or WebP image.")
+                _validate_image_bytes(image)
                 return image
     raise ValueError("Could not retrieve that image.")
 
 
-async def _photo_file_id_from_url(url):
-    data = await _download_image(url)
-    stream = io.BytesIO(data)
-    stream.name = "welcome-image"
+async def _photo_file_id_from_bytes(data, image_format):
+    _validate_image_bytes(data)
+    # Telegram's photo endpoint is most reliable with a named JPEG upload.
+    # Convert supported source formats (including transparent PNG/WebP) safely.
+    with Image.open(io.BytesIO(data)) as image:
+        if image_format == "GIF":
+            image.seek(0)
+        if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
+            rgba = image.convert("RGBA")
+            background = Image.new("RGB", rgba.size, "white")
+            background.paste(rgba, mask=rgba.getchannel("A"))
+            image_to_send = background
+        else:
+            image_to_send = image.convert("RGB")
+        stream = io.BytesIO()
+        image_to_send.save(stream, format="JPEG", quality=90, optimize=True)
+    stream.seek(0)
+    stream.name = "welcome-image.jpg"
     uploaded = await app.send_photo(OWNER_ID, photo=stream)
     try:
+        if not uploaded.photo:
+            raise RuntimeError("Telegram did not return a photo after upload.")
         return uploaded.photo[-1].file_id
     finally:
         try:
             await uploaded.delete()
-        except Exception:
-            pass
+        except Exception as exc:
+            LOGGER.warning("setstart temporary image cleanup failed; exception_type=%s", type(exc).__name__)
+
+
+async def _photo_file_id_from_url(url):
+    data = await _download_image(url)
+    image_format = _validate_image_bytes(data)
+    return await _photo_file_id_from_bytes(data, image_format)
 
 
 def _render_caption(template, first_name="there"):
@@ -269,7 +332,7 @@ async def setstart_callback(_, query):
             return await _show_menu(OWNER_ID, draft, "Reset cancelled; no settings changed.", query.message)
 
 
-@app.on_message(filters.private & filters.user(OWNER_ID) & (filters.text | filters.photo), group=10)
+@app.on_message(filters.private & filters.user(OWNER_ID) & (filters.text | filters.photo | filters.document), group=10)
 async def setstart_collect_input(_, message: Message):
     if not message.from_user or not _is_owner(message.from_user.id):
         return
@@ -292,18 +355,50 @@ async def setstart_collect_input(_, message: Message):
             _rotate(draft)
             return await _show_menu(OWNER_ID, draft, "✅ Draft text updated. Preview it before saving.")
         if draft["mode"] == "image":
+            stage = "detect_input"
             try:
                 if message.photo:
-                    photo_id = message.photo[-1].file_id
+                    media = message.photo[-1]  # Pyrogram lists photo sizes smallest to largest.
+                    if media.file_size and media.file_size > MAX_IMAGE_BYTES:
+                        raise ValueError("Image is too large (maximum 5 MB).")
+                    stage = "download_telegram_photo"
+                    downloaded = await app.download_media(message, in_memory=True)
+                    data = _downloaded_bytes(downloaded)
+                    stage = "validate_telegram_photo"
+                    _validate_image_bytes(data)
+                    photo_id = media.file_id
+                elif message.document:
+                    media = message.document
+                    if media.file_size and media.file_size > MAX_IMAGE_BYTES:
+                        raise ValueError("Image is too large (maximum 5 MB).")
+                    stage = "download_telegram_document"
+                    downloaded = await app.download_media(message, in_memory=True)
+                    data = _downloaded_bytes(downloaded)
+                    stage = "validate_telegram_document"
+                    image_format = _validate_image_bytes(data)
+                    stage = "upload_document_as_photo"
+                    photo_id = await _photo_file_id_from_bytes(data, image_format)
                 elif message.text and not message.text.startswith("/"):
+                    stage = "download_https_url"
                     photo_id = await _photo_file_id_from_url(message.text.strip())
                 else:
-                    return await message.reply_text("Send a Telegram photo or a direct HTTPS image URL.")
-                draft["photo"] = photo_id
-                draft["mode"] = None
-                _rotate(draft)
-                return await _show_menu(OWNER_ID, draft, "✅ Draft image updated. Preview it before saving.")
+                    return await message.reply_text("Send a Telegram photo, an image document, or a direct HTTPS image URL.")
             except ValueError as exc:
+                LOGGER.warning("setstart image rejected; stage=%s exception_type=%s", stage, type(exc).__name__)
                 return await message.reply_text("❌ " + str(exc))
-            except Exception:
-                return await message.reply_text("❌ Image validation/upload failed. The previous draft image is unchanged.")
+            except Exception as exc:
+                LOGGER.error("setstart image input failed; stage=%s exception_type=%s", stage, type(exc).__name__)
+                return await message.reply_text("❌ Image processing failed at the %s stage (%s). The previous draft image is unchanged." % (stage, type(exc).__name__))
+
+            # Commit only after the input has been downloaded and validated. The active
+            # welcome remains unchanged until Save Changes is pressed.
+            if _drafts.get(OWNER_ID) is not draft or not _is_owner(message.from_user.id):
+                return await message.reply_text("⚠️ This editor session is no longer active. Reopen /setstart.")
+            draft["photo"] = photo_id
+            draft["mode"] = None
+            _rotate(draft)
+            try:
+                return await _show_menu(OWNER_ID, draft, "✅ Draft image updated. Preview it before saving.")
+            except Exception as exc:
+                LOGGER.error("setstart image confirmation failed; stage=render_confirmation exception_type=%s", type(exc).__name__)
+                return await message.reply_text("✅ Image validated and added to the draft. Reopen /setstart to continue; live welcome is unchanged.")
