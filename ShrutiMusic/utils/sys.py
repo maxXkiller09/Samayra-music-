@@ -20,6 +20,7 @@
 # Email: badboy809075@gmail.com
 
 
+import asyncio
 import time
 
 import psutil
@@ -28,13 +29,20 @@ from ShrutiMusic.misc import _boot_
 from ShrutiMusic.utils.formatters import get_readable_time
 
 
+def _read_system_metrics():
+    """Collect blocking psutil metrics outside the asyncio event loop."""
+    return (
+        psutil.cpu_percent(interval=0.5),
+        psutil.virtual_memory().percent,
+        psutil.disk_usage("/").percent,
+    )
+
+
 async def bot_sys_stats():
     bot_uptime = int(time.time() - _boot_)
-    UP = f"{get_readable_time(bot_uptime)}"
-    CPU = f"{psutil.cpu_percent(interval=0.5)}%"
-    RAM = f"{psutil.virtual_memory().percent}%"
-    DISK = f"{psutil.disk_usage('/').percent}%"
-    return UP, CPU, RAM, DISK
+    up = get_readable_time(bot_uptime)
+    cpu, ram, disk = await asyncio.to_thread(_read_system_metrics)
+    return up, f"{cpu}%", f"{ram}%", f"{disk}%"
 
 
 # ©️ Copyright Reserved - @NoxxOP  Nand Yaduwanshi
