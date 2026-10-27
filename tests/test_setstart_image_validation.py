@@ -36,6 +36,7 @@ def _validator():
         "MAX_IMAGE_BYTES": 5 * 1024 * 1024,
         "MAX_IMAGE_DIMENSION": 10_000,
         "MAX_IMAGE_PIXELS": 40_000_000,
+        "_IMAGE_FORMATS": {"JPEG", "PNG", "GIF", "WEBP"},
     }
     exec(compile(ast.Module(body=[node], type_ignores=[]), str(PLUGIN_PATH), "exec"), namespace)
     return namespace["_validate_image_bytes"]
@@ -101,6 +102,7 @@ def _image_downloader(response, validate):
         "_validate_image_bytes": validate,
         "MAX_REDIRECTS": 3,
         "MAX_IMAGE_BYTES": 5 * 1024 * 1024,
+        "_IMAGE_FORMATS": {"JPEG", "PNG", "GIF", "WEBP"},
     }
     exec(compile(ast.Module(body=[node], type_ignores=[]), str(PLUGIN_PATH), "exec"), namespace)
     return namespace["_download_image"]
