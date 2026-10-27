@@ -134,6 +134,23 @@ async def _download_image(url):
     raise ValueError("Could not retrieve that image.")
 
 
+def _largest_photo_file_id(photo_sizes):
+    """Return the file_id for the largest Telegram PhotoSize without downloading it."""
+    if not photo_sizes:
+        raise ValueError("No Telegram photo was attached. Send a photo and try again.")
+    largest = max(
+        photo_sizes,
+        key=lambda item: (
+            getattr(item, "file_size", 0) or 0,
+            (getattr(item, "width", 0) or 0) * (getattr(item, "height", 0) or 0),
+        ),
+    )
+    file_id = getattr(largest, "file_id", None)
+    if not file_id:
+        raise ValueError("Telegram did not provide a usable photo file ID.")
+    return file_id
+
+
 async def _photo_file_id_from_url(url):
     data = await _download_image(url)
     stream = io.BytesIO(data)
@@ -294,7 +311,8 @@ async def setstart_collect_input(_, message: Message):
         if draft["mode"] == "image":
             try:
                 if message.photo:
-                    photo_id = message.photo[-1].file_id
+                    # Telegram uploads are native file references: never pass them to URL validation.
+                    photo_id = _largest_photo_file_id(message.photo)
                 elif message.text and not message.text.startswith("/"):
                     photo_id = await _photo_file_id_from_url(message.text.strip())
                 else:

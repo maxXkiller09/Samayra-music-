@@ -51,6 +51,47 @@ class SetStartFeatureRegressionTests(unittest.TestCase):
         self.assertIn("MAX_IMAGE_BYTES", downloader)
         self.assertIn("allow_redirects=False", downloader)
 
+    def test_telegram_photo_upload_uses_largest_native_file_id(self):
+        node = next(
+            node for node in self.tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_largest_photo_file_id"
+        )
+        namespace = {}
+        exec(compile(ast.Module(body=[node], type_ignores=[]), "<largest-photo>", "exec"), namespace)
+
+        class PhotoSize:
+            def __init__(self, file_id, width, height, file_size):
+                self.file_id = file_id
+                self.width = width
+                self.height = height
+                self.file_size = file_size
+
+        sizes = [
+            PhotoSize("small", 90, 90, 1000),
+            PhotoSize("medium", 320, 320, 12000),
+            PhotoSize("large", 1280, 1280, 90000),
+        ]
+        self.assertEqual(namespace["_largest_photo_file_id"](sizes), "large")
+
+    def test_photo_upload_does_not_use_url_validation(self):
+        collector = source_function(self.plugin, "setstart_collect_input")
+        self.assertIn("_largest_photo_file_id(message.photo)", collector)
+        self.assertLess(collector.index("if message.photo:"), collector.index("_photo_file_id_from_url(message.text.strip())"))
+
+    def test_preview_and_save_use_draft_photo_file_id(self):
+        preview = source_function(self.plugin, "_preview")
+        callback = source_function(self.plugin, "setstart_callback")
+        self.assertIn("photo=photo", preview)
+        self.assertIn('save_start_settings(caption, draft.get("photo"))', callback)
+        self.assertIn("Save failed. Previous settings remain active.", callback)
+        self.assertIn("await save_start_settings(caption, draft.get(\"photo\"))", callback)
+
+    def test_start_falls_back_when_saved_photo_id_is_unusable(self):
+        helper = source_function(self.start, "_reply_welcome_photo")
+        self.assertIn("photo=config.START_IMG_URL", helper)
+        self.assertIn("saved Yuvika Music welcome image could not be sent", helper)
+        self.assertIn("_reply_welcome_photo(", self.start)
+
     def test_settings_are_persisted_atomically_in_mongodb(self):
         self.assertIn('{"_id": "global"}', self.settings)
         self.assertIn('"$set": {"caption": caption, "photo": photo}', self.settings)
@@ -59,7 +100,8 @@ class SetStartFeatureRegressionTests(unittest.TestCase):
     def test_start_handlers_read_saved_welcome_settings(self):
         self.assertIn("get_start_settings", self.start)
         self.assertIn("_welcome_payload(message, default_caption)", self.start)
-        self.assertIn("photo=welcome_photo", self.start)
+        self.assertIn("_reply_welcome_photo(", self.start)
+        self.assertIn("welcome_photo, welcome_caption", self.start)
 
     def test_caption_length_uses_telegram_utf16_units(self):
         node = next(
