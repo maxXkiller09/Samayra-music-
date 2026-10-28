@@ -47,3 +47,5 @@ services:
         value: https://t.me/ShrutiBots/91
       - key: START_IMG_URL
         value: https://files.catbox.moe/dp324i.jpg
+      - key: BASE_API_URL
+        value: https://api.shrutibots.in
