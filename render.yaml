@@ -45,3 +45,5 @@ services:
         value: https://github.com/NoxxOP
       - key: DONATE
         value: https://t.me/ShrutiBots/91
+      - key: START_IMG_URL
+        value: https://files.catbox.moe/dp324i.jpg
