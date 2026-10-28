@@ -72,6 +72,11 @@ def _reschedule_if_next_changed(chat_id, attempted_item, _task):
 
 def schedule_next_prefetch(chat_id):
     """Start preparing queue[1] if it is a deferred YouTube item."""
+    # Avoid competing with live audio/video streaming on small hosts.
+    from config import PREFETCH_NEXT_TRACK
+
+    if not PREFETCH_NEXT_TRACK:
+        return None
     queue = db.get(chat_id) or []
     if len(queue) < 2:
         return None
