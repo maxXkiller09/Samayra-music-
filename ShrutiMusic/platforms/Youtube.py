@@ -389,25 +389,82 @@ class YouTubeAPI:
         return ids
 
     async def track(self, link: str, videoid: Union[bool, str] = None):
+        """Resolve YouTube metadata with a yt-dlp fallback if py_yt search fails."""
         if videoid:
             link = self.base + link
-        if "&" in link:
-            link = link.split("&")[0]
-        results = VideosSearch(link, limit=1)
-        for result in (await results.next())["result"]:
-            title = result["title"]
-            duration_min = result["duration"]
-            vidid = result["id"]
-            yturl = result["link"]
-            thumbnail = result["thumbnails"][0]["url"].split("?")[0]
-        track_details = {
-            "title": title,
-            "link": yturl,
-            "vidid": vidid,
-            "duration_min": duration_min,
-            "thumb": thumbnail,
-        }
-        return track_details, vidid
+        link = (link or "").strip()
+        if not link:
+            raise ValueError("Empty YouTube query")
+
+        # Fast path: keep the existing lightweight search first.
+        try:
+            search_link = link.split("&")[0] if "youtube.com/watch" in link else link
+            results = VideosSearch(search_link, limit=1)
+            rows = (await results.next()).get("result") or []
+            if rows:
+                result = rows[0]
+                vidid = result.get("id")
+                if vidid:
+                    title = result.get("title") or "Unknown title"
+                    duration_min = result.get("duration") or ""
+                    yturl = result.get("link") or self.base + vidid
+                    thumbnails = result.get("thumbnails") or []
+                    thumbnail = (
+                        thumbnails[0].get("url", "").split("?")[0]
+                        if thumbnails else f"https://i.ytimg.com/vi/{vidid}/hqdefault.jpg"
+                    )
+                    return {
+                        "title": title,
+                        "link": yturl,
+                        "vidid": vidid,
+                        "duration_min": duration_min,
+                        "thumb": thumbnail,
+                    }, vidid
+        except Exception as exc:
+            print(f"[youtube] py_yt metadata lookup failed: {type(exc).__name__}: {exc}")
+
+        # Fallback: yt-dlp handles direct links and search queries. Run its
+        # synchronous extractor in a worker thread so the asyncio loop stays free.
+        def _extract():
+            source = link
+            if not re.match(r"^https?://", source, re.IGNORECASE):
+                source = f"ytsearch1:{source}"
+            options = {
+                "quiet": True,
+                "no_warnings": True,
+                "skip_download": True,
+                "noplaylist": True,
+                "socket_timeout": 8,
+                "extractor_retries": 1,
+                "retries": 1,
+            }
+            with yt_dlp.YoutubeDL(options) as ydl:
+                info = ydl.extract_info(source, download=False)
+            if info and info.get("entries") is not None:
+                info = next((entry for entry in info.get("entries") or [] if entry), None)
+            if not info:
+                return None
+            vidid = info.get("id")
+            if not vidid:
+                return None
+            seconds = info.get("duration")
+            try:
+                seconds = int(seconds) if seconds is not None else 0
+            except (TypeError, ValueError):
+                seconds = 0
+            duration_min = f"{seconds // 60}:{seconds % 60:02d}" if seconds else ""
+            return {
+                "title": info.get("title") or "Unknown title",
+                "link": info.get("webpage_url") or self.base + vidid,
+                "vidid": vidid,
+                "duration_min": duration_min,
+                "thumb": info.get("thumbnail") or f"https://i.ytimg.com/vi/{vidid}/hqdefault.jpg",
+            }
+
+        details = await asyncio.to_thread(_extract)
+        if not details:
+            raise ValueError("No YouTube track metadata found")
+        return details, details["vidid"]
 
     async def formats(self, link: str, videoid: Union[bool, str] = None):
         if videoid:
