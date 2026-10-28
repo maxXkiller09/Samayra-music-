@@ -71,6 +71,29 @@ class AutoplayMatchingTests(unittest.TestCase):
             -100,
         )
 
+    def test_same_song_alternate_upload_is_rejected(self):
+        current = "Kesariya"
+        for candidate in (
+            "Kesariya slowed reverb",
+            "Kesariya - Brahmastra",
+            "Kesariya female version",
+            "Kesariya (Official Video)",
+        ):
+            self.assertEqual(
+                self.module._score_candidate(
+                    current, {"title": candidate, "duration": "4:12"}
+                ),
+                -100,
+                candidate,
+            )
+
+    def test_different_song_by_same_artist_can_pass_duplicate_guard(self):
+        current = "Arijit Singh - Tum Hi Ho"
+        candidate = {"title": "Arijit Singh - Channa Mereya", "duration": "4:49"}
+        self.assertGreaterEqual(
+            self.module._score_candidate(current, candidate), 1
+        )
+
     def test_duration_filter_rejects_mixes_and_invalid_values(self):
         self.assertTrue(self.module._is_short("4:32"))
         self.assertFalse(self.module._is_short("1:20:00"))
