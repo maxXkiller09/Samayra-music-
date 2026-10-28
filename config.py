@@ -67,6 +67,9 @@ STRING4 = os.getenv("STRING_SESSION4", None)
 STRING5 = os.getenv("STRING_SESSION5", None)
 
 AUTO_LEAVING_ASSISTANT = _env_bool("AUTO_LEAVING_ASSISTANT", False)
+# Background prefetch can compete with live VC playback on low-CPU hosts.
+# Keep it off by default; enable only if the host has spare resources.
+PREFETCH_NEXT_TRACK = _env_bool("PREFETCH_NEXT_TRACK", False)
 
 START_IMG_URL = os.getenv("START_IMG_URL", "https://files.catbox.moe/7q8bfg.jpg")
 PING_IMG_URL = "https://files.catbox.moe/eehxb4.jpg"
