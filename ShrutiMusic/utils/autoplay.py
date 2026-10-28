@@ -60,9 +60,26 @@ async def set_autoplay(chat_id, value: bool):
 
 
 def _clean_title(title):
+    # Normalize upload labels and common alternate versions so autoplay does
+    # not mistake a slowed/reverb/cover upload of the same song for a new track.
     t = re.sub(r"[\(\[\{].*?[\)\]\}]", " ", title or "")
-    t = re.sub(r"(?i)\b(official|video|audio|lyrics?|lyrical|full|song|hd|4k|mp3)\b", " ", t)
+    t = re.sub(
+        r"(?i)\b(official|video|audio|lyrics?|lyrical|full|song|hd|4k|mp3|"
+        r"slowed|reverb|remix|remaster(?:ed)?|cover|karaoke|instrumental|"
+        r"lofi|lo-fi|sped[ -]?up|nightcore|unplugged|reprise|version|status|"
+        r"bass boosted|extended|loop)\b",
+        " ",
+        t,
+    )
     return re.sub(r"\s+", " ", t).strip()[:80]
+
+
+def _track_core(title):
+    """Prefer the track portion of 'artist - track' titles for duplicate checks."""
+    cleaned = _clean_title(title).lower()
+    parts = re.split(r"\s[-–—]\s", cleaned, maxsplit=1)
+    track = parts[1] if len(parts) == 2 and parts[1].strip() else cleaned
+    return _tokens(track)
 
 
 def _tokens(text):
@@ -106,6 +123,17 @@ def _score_candidate(current_title, candidate):
 
     current_words = _tokens(current)
     candidate_words = _tokens(candidate_clean)
+    # Reject alternate uploads of the same underlying track, even when titles
+    # add labels such as "slowed", "Brahmastra", or "female version".
+    current_core = _track_core(current_title)
+    candidate_core = _track_core(title)
+    core_overlap = current_core & candidate_core
+    if current_core and (
+        current_core <= candidate_core
+        or len(core_overlap) / max(1, len(current_core)) >= 0.8
+    ):
+        return -100
+
     shared = current_words & candidate_words
     # Generic words are weak evidence; mood and artist hints matter more.
     generic = {"the", "and", "song", "songs", "official", "video", "audio", "lyrics"}
