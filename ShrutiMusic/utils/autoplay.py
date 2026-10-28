@@ -74,10 +74,10 @@ def _clean_title(title):
     return re.sub(r"\s+", " ", t).strip()[:80]
 
 
-def _track_core(title):
-    """Prefer the track portion of 'artist - track' titles for duplicate checks."""
+def _track_core(title, split_artist=True):
+    """Prefer the track portion of 'artist - track' titles when both titles use it."""
     cleaned = _clean_title(title).lower()
-    parts = re.split(r"\s[-–—]\s", cleaned, maxsplit=1)
+    parts = re.split(r"\s[-–—]\s", cleaned, maxsplit=1) if split_artist else []
     track = parts[1] if len(parts) == 2 and parts[1].strip() else cleaned
     return _tokens(track)
 
@@ -125,8 +125,9 @@ def _score_candidate(current_title, candidate):
     candidate_words = _tokens(candidate_clean)
     # Reject alternate uploads of the same underlying track, even when titles
     # add labels such as "slowed", "Brahmastra", or "female version".
-    current_core = _track_core(current_title)
-    candidate_core = _track_core(title)
+    has_artist_prefix = bool(re.search(r"\s[-–—]\s", current))
+    current_core = _track_core(current_title, split_artist=has_artist_prefix)
+    candidate_core = _track_core(title, split_artist=has_artist_prefix)
     core_overlap = current_core & candidate_core
     if current_core and (
         current_core <= candidate_core
