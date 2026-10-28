@@ -360,7 +360,13 @@ async def play_commnd(
             query = query.replace("-v", "")
         try:
             details, track_id = await YouTube.track(query)
-        except:
+        except Exception as exc:
+            # Keep the user-facing message friendly, but log the real failure
+            # so YouTube/API/network issues can be diagnosed from Render logs.
+            print(
+                f"[play] YouTube track lookup failed for query={query[:160]!r}: "
+                f"{type(exc).__name__}: {exc}"
+            )
             return await mystic.edit_text(_["play_3"])
         streamtype = "youtube"
     if str(playmode) == "Direct":
